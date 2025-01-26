@@ -10,6 +10,7 @@ from datasets.load_sushi_prefrence import load_sushi_data
 from datasets.learn_synthetic_data import learn_synthetic_mallow, learn_synthetic_kendal
 from GMM_diagonalized.DP_partition_estimation import get_partition_estimate_via_dp
 from learning_params_new.learn_kendal import estimate_mallows_parameters
+from log_data.log_american_football import log_american_football_vs_alpha
 if __name__ == "__main__":
     print('running main')
     n=100
@@ -39,8 +40,11 @@ if __name__ == "__main__":
     #test_mle_toy_1()
 
     #step 8: test the american football dataset
-    learn_american_football()
-
+    #log_american_football_vs_alpha(Delta=11,n_file=100,n_top_teams=21,n_bottom_teams=15) # 30
+    #log_american_football_vs_alpha(Delta=11,n_file=100,n_top_teams=21,n_bottom_teams=10) # 25
+    #log_american_football_vs_alpha(Delta=11,n_file=100,n_top_teams=11,n_bottom_teams=15) # 20
+    log_american_football_vs_alpha(Delta=11,n_file=100,n_top_teams=11,n_bottom_teams=10) # 15
+    
     #step 9: test the sushi preference dataset
     #learn_sushi_preference()
     #step 10: test the synthetic data
@@ -48,8 +52,7 @@ if __name__ == "__main__":
     #learn_synthetic_kendal(n=10, alpha=1, beta=1, sigma=np.arange(10))
 
     #step 11: test the kendal dataset
-    # Example usage:
-
+    # Example usage:`
 
 
     

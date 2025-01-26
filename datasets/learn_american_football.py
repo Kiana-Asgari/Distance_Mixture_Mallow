@@ -12,12 +12,12 @@ import sys
 # 1+np.concatenate([top_teams[1:21], top_teams[-15:-5]]):0.19
 # 1+np.concatenate([top_teams[1:21], top_teams[-10:-5]]):0.23
 # 1+np.concatenate([top_teams[1:11], top_teams[-15:-5]]):0.34
-def learn_american_football():
+def learn_american_football(alpha, n_file, desired_teams, Delta):
     print('********************learning american football********************')
     print(' for the first 20 teams')
     teams, votes_dict = load_data(limit=100)
     top_teams = get_top_teams(teams, votes_dict)
-    desired_teams = 1+np.concatenate([top_teams[1:11], top_teams[-15:-5]])
+    desired_teams = 1+np.concatenate([top_teams[1:21], top_teams[-10:-5]])
     full_rankings = get_full_rankings(teams, votes_dict, which_team_to_keep = desired_teams) #keep 20 first teams
     print(f'full_rankings: {full_rankings.shape}')
     
@@ -33,39 +33,28 @@ def learn_american_football():
     print(f'rankings train: {full_rankings_train.shape}')
     print(f'rankings test: {full_rankings_test.shape}')
 
-    pi_0_hat, theta_hat = estimate_mallows_parameters(full_rankings_train)
-    kendal_error = 1/len(full_rankings_test) * negative_log_likelihood(ranking=full_rankings_test, theta=theta_hat, pi_0=pi_0_hat)
 
 
 
-    print(f'Kendal: error: {kendal_error:3f}')
-    print("Kendal: Estimated consensus ranking (pi_0):", pi_0_hat)
-    print("Kendal: Estimated dispersion parameter (theta):", theta_hat)
-
-    for alpha in np.linspace(1, 1.5, 10):
-        beta_opt, sigma_opt = learn_beta_and_sigma(permutation_samples=full_rankings_train,
+    beta_opt, sigma_opt = learn_beta_and_sigma(permutation_samples=full_rankings_train,
                                                     alpha=alpha,
                                                     beta_init=1,
-                                                    Delta=10)
-        error = test_error(full_rankings_test, beta_hat=beta_opt, sigma_hat=sigma_opt, alpha_hat=alpha)
-        print(f'*for alpha={alpha}, beta_opt: {beta_opt:3f}, error: {error:3f}, sigma_opt: {sigma_opt}')
-    sys.exit()
+                                                    Delta=Delta)
+    error = test_error(full_rankings_test, beta_hat=beta_opt, sigma_hat=sigma_opt, alpha_hat=alpha)
+    print(f'*for alpha={alpha}, beta_opt: {beta_opt:3f}, error: {error:3f}, sigma_opt: {sigma_opt}')
+    return beta_opt, sigma_opt, error   
 
 
-    p_hat, theta_hat, sigma_hat, result = fit_mallow(permutation_samples=full_rankings_train, 
-                                                        p_init=np.exp(2),
-                                                        theta_init=np.exp(-2.0),
-                                                        sigma_init=np.arange(20), 
-                                                        Delta=5,
-                                                        max_iter=5000, 
-                                                        tol=1e-6,
-                                                        verbose=True,
-                                                        seed=42)
-    beta_hat = -1*np.log(theta_hat)
-    alpha_hat = np.log(p_hat)
-    print(f'alpha_hat: {alpha_hat}')
-    print(f'beta_hat: {beta_hat}')
-    print(f'sigma_hat: {sigma_hat}')    
+
+    #pi_0_hat, theta_hat = estimate_mallows_parameters(full_rankings_train)
+    #kendal_error = 1/len(full_rankings_test) * negative_log_likelihood(rankings=full_rankings_test, 
+    #                                                                   theta=theta_hat, 
+   #                                                                    pi_0=pi_0_hat)
+
+    #print(f'  Kendal: error: {kendal_error:3f}')
+   # print("  Kendal: Estimated consensus ranking (pi_0):", pi_0_hat)
+    #print("  Kendal: Estimated dispersion parameter (theta):", theta_hat)
+
 
 
 

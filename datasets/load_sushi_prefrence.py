@@ -13,7 +13,8 @@ def load_sushi_data():
     file_path = 'datasets/sushi3-2016/sushi3a.5000.10.order'
     try:
         # Load the data, skipping the first row and using columns 1 to 10
-        data = np.loadtxt(file_path, skiprows=1, usecols=range(1, 11))
+        data = np.loadtxt(file_path, skiprows=1, usecols=range(2, 12))
+        data = data.astype(int)
         return data
     except Exception as e:
         print(f"Error loading data: {e}")
