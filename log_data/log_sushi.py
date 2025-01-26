@@ -1,12 +1,10 @@
 import numpy as np
 import json
 import os
-from datasets.learn_american_football import get_full_rankings, get_top_teams
-from datasets.load_american_football import load_data
 from learning_params_new.learn_alpha import learn_beta_and_sigma
 from learning_params_new.likelihood_test import test_error
+from datasets.load_sushi_prefrence import load_sushi_data
 from learning_params_new.learn_kendal import estimate_mallows_parameters, negative_log_likelihood
-
 
 """
 
@@ -15,10 +13,9 @@ for each n_file and desired_teams there is a different json file
 
 
 """
-def log_american_football_vs_alpha(n_file, n_top_teams, n_bottom_teams, 
-                                   Delta, seed=42):
+def log_sushi_vs_alpha(Delta, seed=42):
     # Create filename based on parameters
-    filename = f'log_data/football_results_n{n_file}_1:top{n_top_teams}_bottom{n_bottom_teams}:-5.json'
+    filename = f'log_data/sushi_results.json'
     
     # Load existing data if file exists
     existing_data = {}
@@ -28,19 +25,18 @@ def log_american_football_vs_alpha(n_file, n_top_teams, n_bottom_teams,
     
     np.random.seed(seed)  # For reproducibility
 
-    teams, votes_dict = load_data(limit=n_file)
 
-    top_teams = get_top_teams(teams, votes_dict)
-    desired_teams = 1+np.concatenate([top_teams[1:n_top_teams], top_teams[-n_bottom_teams:-5]])
-    full_rankings = get_full_rankings(teams, votes_dict, which_team_to_keep = desired_teams)
-    print(f'full_rankings: {full_rankings.shape}')
-    
+    print('***********learn_sushi_preference***********')
+    full_rankings = load_sushi_data()
+    print(f'sushi_rankings data: {full_rankings.shape}')
+
     # Create 5 folds
+    np.random.seed(42)  # For reproducibility
     n_samples = full_rankings.shape[0]
     indices = np.random.permutation(n_samples)
     fold_size = n_samples // 5
-
-    alpha_list = np.linspace(1, 2, 100)
+    
+    alpha_list = np.linspace(1, 3, 200)
 
     for alpha in alpha_list:
         # Convert alpha to string for JSON key (with limited precision)
@@ -74,14 +70,13 @@ def log_american_football_vs_alpha(n_file, n_top_teams, n_bottom_teams,
             
             # Train model
             pi_0_hat, theta_hat = estimate_mallows_parameters(full_rankings_train)
-            kendal_error = 1/len(full_rankings_test) * negative_log_likelihood(rankings=full_rankings_test, 
-                                                                           theta=theta_hat, 
-                                                                           pi_0=pi_0_hat)
+            kendal_error = 1/len(full_rankings_test) * negative_log_likelihood(rankings=full_rankings_test, theta=theta_hat, pi_0=pi_0_hat)
 
-            print(f'  Kendal: error: {kendal_error:3f}')
-            print("  Kendal: Estimated consensus ranking (pi_0):", pi_0_hat)
-            print("  Kendal: Estimated dispersion parameter (theta):", theta_hat)
-            
+
+
+            print(f'Kendal: error: {kendal_error:3f}')
+            print("Kendal: Estimated consensus ranking (pi_0):", pi_0_hat)
+            print("Kendal: Estimated dispersion parameter (theta):", theta_hat)
             beta_opt, sigma_opt = learn_beta_and_sigma(permutation_samples=full_rankings_train,
                                                      alpha=alpha,
                                                      beta_init=1,
@@ -113,7 +108,7 @@ def log_american_football_vs_alpha(n_file, n_top_teams, n_bottom_teams,
             } for i in range(5)]
         }
         
-        # Save after each iteration to prevent data loss
+        # Save after each alpha to prevent data loss
         with open(filename, 'w') as f:
             json.dump(existing_data, f, indent=4)
             

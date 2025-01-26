@@ -15,7 +15,7 @@ def learn_sushi_preference():
 
  # Randomly select 50 rankings for the test set
     np.random.seed(42)  # For reproducibility
-    test_indices = np.random.choice(full_rankings.shape[0], 50, replace=False)
+    test_indices = np.random.choice(full_rankings.shape[0], 200, replace=False)
     full_rankings_test = full_rankings[test_indices]
 
     # Use the remaining rankings for training
@@ -34,11 +34,11 @@ def learn_sushi_preference():
     print("Kendal: Estimated consensus ranking (pi_0):", pi_0_hat)
     print("Kendal: Estimated dispersion parameter (theta):", theta_hat)
 
-    for alpha in np.linspace(1, 1.5, 10):
+    for alpha in np.linspace(1, 4, 20):
         beta_opt, sigma_opt = learn_beta_and_sigma(permutation_samples=full_rankings_train,
                                                     alpha=alpha,
                                                     beta_init=1,
-                                                    Delta=9)
+                                                    Delta=10)
         error = test_error(full_rankings_test, beta_hat=beta_opt, sigma_hat=sigma_opt, alpha_hat=alpha)
         print(f'*for alpha={alpha}, beta_opt: {beta_opt:3f}, error: {error:3f}, sigma_opt: {sigma_opt}')
     sys.exit()
