@@ -69,7 +69,7 @@ def nll_and_grad_beta(args, permutation_samples,
     nll = 1/m * (beta * np.sum(distance_matrix) + m * np.log(partition))
 
     grad_beta = 1/m * np.sum(distance_matrix)  +  (np.log(partition_2) - np.log(partition)) / eps
-    #print(f'   nll: {nll:3f}, grad_beta: {grad_beta:3f}, beta: {beta:3f}')
+    print(f'   nll: {nll:3f}, grad_beta: {grad_beta:3f}, beta: {beta:3f}')
 
     return grad_beta
 
