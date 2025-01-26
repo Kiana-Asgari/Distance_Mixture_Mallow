@@ -36,7 +36,7 @@ def learn_american_football():
         beta_opt, sigma_opt = learn_beta_and_sigma(permutation_samples=full_rankings_train,
                                                     alpha=alpha,
                                                     beta_init=1,
-                                                    Delta=10)
+                                                    Delta=11)
         error = test_error(full_rankings_test, beta_hat=beta_opt, sigma_hat=sigma_opt, alpha_hat=alpha)
         print(f'*for alpha={alpha}, beta_opt: {beta_opt:3f}, error: {error:3f}, sigma_opt: {sigma_opt}')
     sys.exit()
