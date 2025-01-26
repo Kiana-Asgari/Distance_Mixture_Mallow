@@ -9,6 +9,7 @@ from datasets.learn_sushi_prefrence import learn_sushi_preference
 from datasets.load_sushi_prefrence import load_sushi_data
 from datasets.learn_synthetic_data import learn_synthetic_mallow, learn_synthetic_kendal
 from GMM_diagonalized.DP_partition_estimation import get_partition_estimate_via_dp
+from learning_params_new.learn_kendal import estimate_mallows_parameters
 if __name__ == "__main__":
     print('running main')
     n=100
@@ -45,4 +46,10 @@ if __name__ == "__main__":
     #step 10: test the synthetic data
     #learn_synthetic_mallow(n=10, alpha=1, beta=1, sigma=np.arange(10))
     #learn_synthetic_kendal(n=10, alpha=1, beta=1, sigma=np.arange(10))
+
+    #step 11: test the kendal dataset
+    # Example usage:
+
+
+
     
