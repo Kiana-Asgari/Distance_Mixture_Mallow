@@ -41,13 +41,13 @@ if __name__ == "__main__":
     #test_mle_toy_1()
 
     #step 8: test the american football dataset
-    #log_american_football_vs_alpha(Delta=11,n_file=100,n_top_teams=21,n_bottom_teams=15) # 4:30
+    log_american_football_vs_alpha(Delta=11,n_file=100,n_top_teams=21,n_bottom_teams=15) # 4:30
     #log_american_football_vs_alpha(Delta=11,n_file=100,n_top_teams=21,n_bottom_teams=10) # 3:25
     #log_american_football_vs_alpha(Delta=11,n_file=100,n_top_teams=11,n_bottom_teams=15) # 2:20
     #log_american_football_vs_alpha(Delta=11,n_file=100,n_top_teams=11,n_bottom_teams=10) # 1:15
     
     #step 9: test the sushi preference dataset
-    log_sushi_vs_alpha(Delta=10)
+    #log_sushi_vs_alpha(Delta=10)
     #step 10: test the synthetic data
     #learn_synthetic_mallow(n=10, alpha=1, beta=1, sigma=np.arange(10))
     #learn_synthetic_kendal(n=10, alpha=1, beta=1, sigma=np.arange(10))
