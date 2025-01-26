@@ -3,7 +3,7 @@ from datasets.load_american_football import load_data
 
 from learning_params_new.learn_alpha import learn_beta_and_sigma
 from learning_params_new.likelihood_test import test_error
-from learning_params_new.learn_kendal import estimate_mallows_parameters
+from learning_params_new.learn_kendal import estimate_mallows_parameters, negative_log_likelihood
 import sys
 
 
@@ -34,7 +34,10 @@ def learn_american_football():
     print(f'rankings test: {full_rankings_test.shape}')
 
     pi_0_hat, theta_hat = estimate_mallows_parameters(full_rankings_train)
-    kendal_error = test_error(full_rankings_test, beta_hat=theta_hat, sigma_hat=pi_0_hat, alpha_hat=1)
+    kendal_error = 1/len(full_rankings_test) * negative_log_likelihood(ranking=full_rankings_test, theta=theta_hat, pi_0=pi_0_hat)
+
+
+
     print(f'Kendal: error: {kendal_error:3f}')
     print("Kendal: Estimated consensus ranking (pi_0):", pi_0_hat)
     print("Kendal: Estimated dispersion parameter (theta):", theta_hat)
