@@ -3,7 +3,7 @@ from datasets.load_american_football import load_data
 
 from learning_params_new.learn_alpha import learn_beta_and_sigma
 from learning_params_new.likelihood_test import test_error
-from learning_params_new.learn_kendal import estimate_mallows_parameters, negative_log_likelihood
+
 import sys
 
 

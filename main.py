@@ -1,17 +1,10 @@
 import numpy as np
 import sys
 
-from tests_basics import test_permanent, test_partial_permanent, test_alpha_distance
-from test_grads import displacement_empirical_test, displacement_expectation_test, optimal_sigma_test
-from test_mle_toy import test_mle_toy_1
-from datasets.learn_american_football import learn_american_football
-from datasets.learn_sushi_prefrence import learn_sushi_preference
-from datasets.load_sushi_prefrence import load_sushi_data
-from datasets.learn_synthetic_data import learn_synthetic_mallow, learn_synthetic_kendal
-from GMM_diagonalized.DP_partition_estimation import get_partition_estimate_via_dp
-from learning_params_new.learn_kendal import estimate_mallows_parameters
-from log_data.log_american_football import log_american_football_vs_alpha
-from log_data.log_sushi import log_sushi_vs_alpha
+from log_data.log_american_football import log_american_football_vs_alpha, plot_football_results, plot_football_first_fold
+
+
+
 if __name__ == "__main__":
     print('running main')
     n=100
