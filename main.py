@@ -38,7 +38,7 @@ if __name__ == "__main__":
     #log_american_football_vs_alpha(Delta=11,n_file=100,n_top_teams=21,n_bottom_teams=10) # 3:25
     #log_american_football_vs_alpha(Delta=11,n_file=100,n_top_teams=11,n_bottom_teams=15) # 2:20
     #log_american_football_vs_alpha(Delta=11,n_file=100,n_top_teams=11,n_bottom_teams=10) # 1:15
-    
+    #plot_football_first_fold(n_file=100, n_top_teams=11, n_bottom_teams=10)
     #step 9: test the sushi preference dataset
     #log_sushi_vs_alpha(Delta=10)
     #step 10: test the synthetic data

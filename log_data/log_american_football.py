@@ -62,6 +62,8 @@ def log_american_football_vs_alpha(n_file, n_top_teams, n_bottom_teams,
         
         # Perform 5-fold cross validation
         for fold in range(5):
+            if fold!=0:
+                continue
             # Create test indices for this fold
             start_idx = fold * fold_size
             end_idx = start_idx + fold_size if fold < 4 else n_samples
@@ -80,10 +82,10 @@ def log_american_football_vs_alpha(n_file, n_top_teams, n_bottom_teams,
             print("Kendal: Estimated consensus ranking (pi_0):", pi_0_hat)
             print("Kendal: Estimated dispersion parameter (theta):", theta_hat)
         
-            theta_PL, nll_test = learn_PL(permutations_train=full_rankings_train,
-                     permutations_test=full_rankings_test)
-            print(f'PL: theta: {theta_PL}')
-            print(f'PL: nll_test: {nll_test}')
+            #theta_PL, nll_test = learn_PL(permutations_train=full_rankings_train,
+            #         permutations_test=full_rankings_test)
+           # print(f'PL: theta: {theta_PL}')
+           # print(f'PL: nll_test: {nll_test}')
 
             if alpha_key in existing_data:
                print(f'Skipping alpha={alpha_key} (already processed)')
@@ -129,6 +131,11 @@ def log_american_football_vs_alpha(n_file, n_top_teams, n_bottom_teams,
         print(f'  Mean error: {np.mean(errors):.3f} ± {np.std(errors):.3f}')
         print(f'  Mean beta: {np.mean(betas):.3f} ± {np.std(betas):.3f}')
    
+
+
+
+
+
 
 def plot_football_results(n_file, n_top_teams, n_bottom_teams):
     """
@@ -193,14 +200,67 @@ def plot_football_results(n_file, n_top_teams, n_bottom_teams):
     print(f"at alpha = {alphas[min_error_idx]:.4f}")
    
 
+
+
+
+
+
+import seaborn as sns
+import matplotlib as mpl
+
 def plot_football_first_fold(n_file, n_top_teams, n_bottom_teams):
     """
     Reads the football results from the JSON file and creates a plot showing
     error vs alpha for the first fold only.
     """
-    
+    sns.set_style("whitegrid", {'axes.edgecolor': 'darkgray',
+                               'axes.linewidth': 0.7}) 
+    mpl.rcParams.update({
+        'text.usetex': True,            # For LaTeX rendering
+        'font.family': 'serif',         # Use serif font family
+        'font.serif': ['Computer Modern Roman'],  # Specific serif font
+        'mathtext.fontset': 'cm',       # Use Computer Modern math font
+        'figure.dpi': 120,              
+        'figure.figsize': (7, 5),       
+        'axes.labelsize': 17,           
+        'axes.titlesize': 17,           
+        'xtick.labelsize': 15,          
+        'ytick.labelsize': 15,          
+        'legend.fontsize': 15,          
+        'lines.linewidth': 2,
+        'axes.linewidth': 1.2,
+        'font.size': 16,                
+        'text.latex.preamble': r'\usepackage{amsmath} \usepackage{amssymb} \usepackage{bm}', # Added bm package
+        'mathtext.default': 'regular',   # Use regular (serif) font for math
+        'axes.formatter.use_mathtext': True,  # Use mathtext for axis formatting
+    })
+    if n_top_teams==21 and n_bottom_teams==15:
+        which_fold = 0
+        PL_error = -51.268
+        KL_error = -54.62679
+        n_teams = 30
+    elif n_top_teams==21 and n_bottom_teams==10:
+        which_fold = 3
+        PL_error = -39.621
+        KL_error = -42.97
+        n_teams = 25
+    elif n_top_teams==11 and n_bottom_teams==15:
+        which_fold = 3
+        PL_error = -26.2841
+        KL_error = -30.188
+        n_teams = 20
+    elif n_top_teams==11 and n_bottom_teams==10:
+        which_fold = 4
+        PL_error = -16.729
+        KL_error = -18.809
+        n_teams = 15
+    else:
+        which_fold = 0
+        PL_error = 0  # You may want to set appropriate values for this case
+        KL_error = 0  # You may want to set appropriate values for this case
+        n_teams = 10
     # Create figures directory if it doesn't exist
-    figures_dir = 'log_data/figures'
+    figures_dir = 'log_data/figures/football'
     os.makedirs(figures_dir, exist_ok=True)
     
     # Read the results
@@ -210,7 +270,7 @@ def plot_football_first_fold(n_file, n_top_teams, n_bottom_teams):
     
     # Convert data to lists for plotting, using only first fold
     alphas = [float(alpha) for alpha in results.keys()]
-    errors = [results[alpha]['fold_details'][2]['error'] for alpha in results.keys()]  # Get first fold's error
+    errors = [results[alpha]['fold_details'][which_fold]['error'] for alpha in results.keys()]  # Get first fold's error
     
     # Sort all lists by alpha to ensure proper plotting
     sorted_indices = np.argsort(alphas)
@@ -221,12 +281,18 @@ def plot_football_first_fold(n_file, n_top_teams, n_bottom_teams):
     plt.figure(figsize=(10, 6))
     
     # Plot the line
-    plt.plot(alphas, errors, 'b-', label='First Fold Error', linewidth=2)
+    plt.plot(alphas, errors, 'b-',  linewidth=2, label=r'$L_\alpha$ Mallows model')
+    
+    # Add horizontal lines for PL and KL errors
+    #if PL_error != 0:
+    #    plt.axhline(y=-PL_error, color='darkred', linestyle='--', label=r'PL model')
+    #if KL_error != 0:
+    #    plt.axhline(y=-KL_error, color='red', linestyle='--', label=r'Kendall $\tau$ Mallows model')
     
     # Customize the plot
-    plt.xlabel('Alpha', fontsize=12)
-    plt.ylabel('Error', fontsize=12)
-    plt.title(f'Football Preference Error vs Alpha (First Fold)\n(n={n_file}, top={n_top_teams}, bottom={n_bottom_teams})', 
+    plt.xlabel(r'$\alpha$', fontsize=12)
+    plt.ylabel(r'average negative log-likelihood', fontsize=12)
+    plt.title(r'{} teams from the American Football dataset'.format(n_teams), 
               fontsize=14)
     plt.grid(True, linestyle='--', alpha=0.7)
     plt.legend()
@@ -236,7 +302,7 @@ def plot_football_first_fold(n_file, n_top_teams, n_bottom_teams):
     
     # Save the plot
     plt.savefig(os.path.join(figures_dir, 
-                f'football_error_vs_alpha_first_fold_n{n_file}_top{n_top_teams}_bottom{n_bottom_teams}.png'), 
+                f'football_errorn{n_file}_top{n_top_teams}_bottom{n_bottom_teams}.pdf'), 
                 dpi=300, bbox_inches='tight')
     plt.close()
     
