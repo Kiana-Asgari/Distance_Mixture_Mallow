@@ -37,10 +37,17 @@ def log_basketball_vs_alpha(n_file, n_top_teams, n_bottom_teams,
     full_rankings = get_full_rankings(teams, votes_dict, which_team_to_keep = desired_teams)
     print(f'full_rankings: {full_rankings.shape}')
     
-    # Create 5 folds
+    # Split data into train and test (20% test)
     n_samples = full_rankings.shape[0]
     indices = np.random.permutation(n_samples)
-    fold_size = n_samples // 5
+    test_size = int(0.2 * n_samples)
+    test_indices = indices[:test_size]
+    train_indices = indices[test_size:]
+    
+    full_rankings_test = full_rankings[test_indices]
+    full_rankings_train = full_rankings[train_indices]
+    
+    print(f'Train shape: {full_rankings_train.shape}, Test shape: {full_rankings_test.shape}')
 
     alpha_list = np.linspace(1, 2, 100)
 
@@ -51,69 +58,35 @@ def log_basketball_vs_alpha(n_file, n_top_teams, n_bottom_teams,
         # Skip if this alpha has already been processed
         if alpha_key in existing_data:
             print(f'Skipping alpha={alpha_key} (already processed)')
-            #continue
+            continue
             
         print(f'Processing alpha={alpha_key}...')
         
-        # Initialize arrays to store results from each fold
-        errors = []
-        betas = []
-        sigmas = []
-        
-        # Perform 5-fold cross validation
-        for fold in range(5):
-            # Create test indices for this fold
-            start_idx = fold * fold_size
-            end_idx = start_idx + fold_size if fold < 4 else n_samples
-            test_indices = indices[start_idx:end_idx]
-            train_indices = np.concatenate([indices[:start_idx], indices[end_idx:]])
-            
-            # Split data into train and test
-            full_rankings_test = full_rankings[test_indices]
-            full_rankings_train = full_rankings[train_indices]
-            
-            print(f'Fold {fold+1}: train shape: {full_rankings_train.shape}, test shape: {full_rankings_test.shape}')
-            
-            pi_0_hat, theta_hat, kendal_error = learn_kendal(full_rankings_train, full_rankings_test)
+        pi_0_hat, theta_hat, kendal_error = learn_kendal(full_rankings_train, full_rankings_test)
+        print(f'Kendal: error: {kendal_error:3f}')
+        print("Kendal: Estimated consensus ranking (pi_0):", pi_0_hat)
+        print("Kendal: Estimated dispersion parameter (theta):", theta_hat)
+    
+        theta_PL, nll_test = learn_PL(permutations_train=full_rankings_train,
+                 permutations_test=full_rankings_test)
+        print(f'PL: theta: {theta_PL}')
+        print(f'PL: nll_test: {nll_test}')
 
-            print(f'Kendal: error: {kendal_error:3f}')
-            print("Kendal: Estimated consensus ranking (pi_0):", pi_0_hat)
-            print("Kendal: Estimated dispersion parameter (theta):", theta_hat)
+        beta_opt, sigma_opt = learn_beta_and_sigma(permutation_samples=full_rankings_train,
+                                                 alpha=alpha,
+                                                 beta_init=1,
+                                                 Delta=Delta)
         
-            theta_PL, nll_test = learn_PL(permutations_train=full_rankings_train,
-                     permutations_test=full_rankings_test)
-            print(f'PL: theta: {theta_PL}')
-            print(f'PL: nll_test: {nll_test}')
-
-            beta_opt, sigma_opt = learn_beta_and_sigma(permutation_samples=full_rankings_train,
-                                                     alpha=alpha,
-                                                     beta_init=1,
-                                                     Delta=Delta)
-            
-            # Test model
-            error = test_error(full_rankings_test, beta_hat=beta_opt, sigma_hat=sigma_opt, alpha_hat=alpha)
-            
-            errors.append(error)
-            betas.append(beta_opt)
-            sigmas.append(sigma_opt)
+        # Test model
+        error = test_error(full_rankings_test, beta_hat=beta_opt, sigma_hat=sigma_opt, alpha_hat=alpha)
         
-        # Store average results across folds
+        # Store results
         existing_data[alpha_key] = {
-            'beta': float(np.mean(betas)),
-            'beta_std': float(np.std(betas)),
-            'sigma': np.mean(sigmas, axis=0).tolist(),  # Average sigma across folds
-            'error': float(np.mean(errors)),
-            'error_std': float(np.std(errors)),
-            # Store individual fold results
-            'fold_errors': [float(e) for e in errors],
-            'fold_betas': [float(b) for b in betas],
-            'fold_sigmas': [s.tolist() for s in sigmas],  # Store each fold's sigma
-            'fold_details': [{  # Store detailed info for each fold
-                'fold': i+1,
-                'error': float(errors[i]),
-                'beta': float(betas[i]),
-                'sigma': sigmas[i].tolist()
-            } for i in range(5)]
+            'beta': float(beta_opt),
+            'sigma': sigma_opt.tolist(),
+            'error': float(error),
+            'kendal_error': float(kendal_error),
+            'PL_error': float(nll_test)
         }
         
         # Save after each iteration to prevent data loss
@@ -121,8 +94,8 @@ def log_basketball_vs_alpha(n_file, n_top_teams, n_bottom_teams,
             json.dump(existing_data, f, indent=4)
             
         print(f'*for alpha={alpha}:')
-        print(f'  Mean error: {np.mean(errors):.3f} ± {np.std(errors):.3f}')
-        print(f'  Mean beta: {np.mean(betas):.3f} ± {np.std(betas):.3f}')
+        print(f'  Error: {error:.3f}')
+        print(f'  Beta: {beta_opt:.3f}')
    
 
 def plot_football_results(n_file, n_top_teams, n_bottom_teams):
