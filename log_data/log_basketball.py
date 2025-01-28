@@ -49,7 +49,7 @@ def log_basketball_vs_alpha(n_file, n_top_teams, n_bottom_teams,
     
     print(f'Train shape: {full_rankings_train.shape}, Test shape: {full_rankings_test.shape}')
 
-    alpha_list = np.linspace(1, 2, 100)
+    alpha_list = np.linspace(2, 3, 100)
 
     for alpha in alpha_list:
         # Convert alpha to string for JSON key (with limited precision)
