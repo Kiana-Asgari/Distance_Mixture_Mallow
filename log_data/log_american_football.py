@@ -62,8 +62,8 @@ def log_american_football_vs_alpha(n_file, n_top_teams, n_bottom_teams,
         
         # Perform 5-fold cross validation
         for fold in range(5):
-            if fold!=0:
-                continue
+            #if fold!=0:
+            #    continue
             # Create test indices for this fold
             start_idx = fold * fold_size
             end_idx = start_idx + fold_size if fold < 4 else n_samples
