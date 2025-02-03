@@ -82,10 +82,10 @@ def log_american_football_vs_alpha(n_file, n_top_teams, n_bottom_teams,
             print("Kendal: Estimated consensus ranking (pi_0):", pi_0_hat)
             print("Kendal: Estimated dispersion parameter (theta):", theta_hat)
         
-            #theta_PL, nll_test = learn_PL(permutations_train=full_rankings_train,
-            #         permutations_test=full_rankings_test)
-           # print(f'PL: theta: {theta_PL}')
-           # print(f'PL: nll_test: {nll_test}')
+           # theta_PL, nll_test = learn_PL(permutations_train=full_rankings_train,
+           #          permutations_test=full_rankings_test)
+          #  print(f'PL: theta: {theta_PL}')
+          #  print(f'PL: nll_test: {nll_test}')
 
             if alpha_key in existing_data:
                print(f'Skipping alpha={alpha_key} (already processed)')
@@ -271,11 +271,13 @@ def plot_football_first_fold(n_file, n_top_teams, n_bottom_teams):
     # Convert data to lists for plotting, using only first fold
     alphas = [float(alpha) for alpha in results.keys()]
     errors = [results[alpha]['fold_details'][which_fold]['error'] for alpha in results.keys()]  # Get first fold's error
+    betas = [results[alpha]['fold_details'][which_fold]['beta'] for alpha in results.keys()]  # Get first fold's beta
     
     # Sort all lists by alpha to ensure proper plotting
     sorted_indices = np.argsort(alphas)
     alphas = np.array(alphas)[sorted_indices]
     errors = -1 * np.array(errors)[sorted_indices]
+    betas = np.array(betas)[sorted_indices]
     
     # Create the plot
     plt.figure(figsize=(10, 6))
@@ -306,9 +308,10 @@ def plot_football_first_fold(n_file, n_top_teams, n_bottom_teams):
                 dpi=300, bbox_inches='tight')
     plt.close()
     
-    # Find and print the minimum error point
+    # Find and print the minimum error point with associated alpha and beta
     min_error_idx = np.argmin(errors)
-    print(f"Minimum error (first fold): {errors[min_error_idx]:.4f}")
+    print(f"Minimum error (fold {which_fold}): {errors[min_error_idx]:.4f}")
     print(f"at alpha = {alphas[min_error_idx]:.4f}")
+    print(f"with beta = {betas[min_error_idx]:.4f}")
    
 
