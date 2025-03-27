@@ -36,3 +36,49 @@ def learn_kendal(permutations_train, permutations_test):
     return pi_0, theta_hat, error
 
 
+###########################################
+#sample from the learned model
+###########################################
+import random
+import math
+
+def sample_kendal(theta, sigma_0, n_samples=1000):
+    """
+    Sample permutations from a Mallows model (Kendall's tau distance)
+    with central ranking sigma_0 and concentration parameter theta.
+
+    The insertion is reversed so that each new item in sigma_0
+    is more likely to be inserted near the *end* of the partial permutation
+    (rather than the front), matching the forward order given by sigma_0:
+
+      - Start with an empty list.
+      - For each item in sigma_0 (in the given order),
+        you generate an insertion position in [0..len(perm)] 
+        with weight propto exp(-theta*(reverse_index)).
+
+      - If you compute 'reverse_index' = (length_of_perm - position), 
+        high weight goes to positions closer to the end. 
+    """
+    sampled_perms = []
+
+    for _ in range(n_samples):
+        perm = []
+        for item in sigma_0:
+            length = len(perm)  # current partial length
+            # Compute unnormalized weights so that the *end* is favored
+            #    position goes from 0..length
+            #    reverse_index = length - position
+            weights = [math.exp(-theta * (length - k)) for k in range(length + 1)]
+            total = sum(weights)
+
+            r = random.random() * total
+            cumsum = 0
+            for k, w in enumerate(weights):
+                cumsum += w
+                if r <= cumsum:
+                    perm.insert(k, item)  # Insert at position k
+                    break
+
+        sampled_perms.append(1+np.array(perm))
+
+    return np.array(sampled_perms)

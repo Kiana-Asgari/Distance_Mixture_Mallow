@@ -136,3 +136,32 @@ class PlackettLuceModel:
         
         # Normalize by number of test permutations
         return total_nll / len(permutations_test)
+    
+
+
+def sample_PL(utilities, n_samples=1000):
+    """
+    Sample permutations from the Plackett-Luce distribution given the item utilities.
+    Position 0 in each permutation = *least* preferred item.
+    """
+    n_items = len(utilities)
+    permutations = np.zeros((n_samples, n_items), dtype=int)
+
+    for s in range(n_samples):
+        available_items = list(range(n_items))
+        # We'll keep track of chosen items in order from best to worst
+        chosen_items_in_order = []
+
+        for _ in range(n_items):
+            exp_values = np.exp(utilities[available_items])
+            probabilities = exp_values / np.sum(exp_values)
+            chosen_index = np.random.choice(len(available_items), p=probabilities)
+            chosen_item = available_items.pop(chosen_index)
+            chosen_items_in_order.append(chosen_item)
+
+        # Reverse so that index 0 is the worst, and the last index is the best
+        chosen_items_in_order.reverse()
+        permutations[s, :] = chosen_items_in_order
+
+    return permutations
+
