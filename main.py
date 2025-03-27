@@ -2,17 +2,53 @@ import numpy as np
 import sys
 
 from log_data.log_american_football import log_american_football_vs_alpha, plot_football_results, plot_football_first_fold
-from log_data.log_basketball import log_basketball_vs_alpha, plot_basketball_results
+from log_data.log_basketball import log_basketball_vs_alpha, plot_basketball_results, top_k_accuracy_basketball
 from learning_params_new.top_k_test import top_k_accuracy
 from GMM_diagonalized.sampling import sample_mallow
 from learning_params_new.learn_kendal import sample_kendal
 from learning_params_new.learn_PL import sample_PL
+
+
+
+def top_k_accuracy_basketball_test(Delta=11, n_file=100, n_top_teams=11, n_bottom_teams=10):
+    alpha_mallow, beta_mallow, sigma_mallow, theta_kendal, sigma_0_kendal, theta_PL = top_k_accuracy_basketball(Delta=Delta, n_file=n_file, n_top_teams=n_top_teams, n_bottom_teams=n_bottom_teams)
+    print(f"alpha_mallow: {alpha_mallow}, beta_mallow: {beta_mallow}, sigma_mallow: {sigma_mallow}, theta_kendal: {theta_kendal}, sigma_0_kendal: {sigma_0_kendal}, theta_PL: {theta_PL}")
+    
+    sampled_perms = sample_kendal(theta=theta_kendal, sigma_0=sigma_0_kendal, n_samples=1000)
+    accuracy = top_k_accuracy(sampled_perms=sampled_perms, top_k=5)
+    print(f"Top-5 accuracy Kendal: {accuracy:.4f}")
+    accuracy = top_k_accuracy(sampled_perms=sampled_perms, top_k=10)
+    print(f"Top-10 accuracy Kendal: {accuracy:.4f}")
+
+    sampled_perms = sample_PL(utilities=theta_PL, n_samples=1000)
+    accuracy = top_k_accuracy(sampled_perms=sampled_perms, top_k=5)
+    print(f"Top-5 accuracy PL: {accuracy:.4f}")
+    accuracy = top_k_accuracy(sampled_perms=sampled_perms, top_k=10)
+    print(f"Top-10 accuracy PL: {accuracy:.4f}")
+
+    sampled_perms = sample_mallow(sigma=sigma_mallow, alpha=alpha_mallow, beta=beta_mallow, Delta=Delta, n_samples=1000)
+    accuracy = top_k_accuracy(sampled_perms=sampled_perms, top_k=5)
+    print(f"Top-5 accuracy Mallow: {accuracy:.4f}")
+    accuracy = top_k_accuracy(sampled_perms=sampled_perms, top_k=10)
+    print(f"Top-10 accuracy Mallow: {accuracy:.4f}")
+
+
+
 if __name__ == "__main__":
     print('running main')
     n=100
     Delta=10
     alpha=1
     beta=1
+
+    top_k_accuracy_basketball_test(Delta=Delta, n_file=n, n_top_teams=11, n_bottom_teams=10)
+    #top_k_accuracy_basketball_test(Delta=Delta, n_file=n, n_top_teams=11, n_bottom_teams=15)
+    #top_k_accuracy_basketball_test(Delta=Delta, n_file=n, n_top_teams=11, n_bottom_teams=10)
+    #top_k_accuracy_basketball_test(Delta=Delta, n_file=n, n_top_teams=21, n_bottom_teams=15)
+
+    
+
+
     #step 1: test the permanent
     #test_permanent(n=n, Delta=Delta, alpha=alpha, beta=beta)
     #get_partition_estimate_via_dp(n=n, beta=beta, alpha=alpha, Delta=Delta)
@@ -36,12 +72,21 @@ if __name__ == "__main__":
     #test_mle_toy_1()
 
     #step 8: test the american football dataset
-    log_basketball_vs_alpha(Delta=11,n_file=100,n_top_teams=21,n_bottom_teams=15) # 4:30
+    #log_basketball_vs_alpha(Delta=11,n_file=100,n_top_teams=21,n_bottom_teams=15) # 4:30
     #log_basketball_vs_alpha(Delta=11,n_file=100,n_top_teams=21,n_bottom_teams=10) # 3:25
     #log_basketball_vs_alpha(Delta=11,n_file=100,n_top_teams=11,n_bottom_teams=15) # 2:20
     #log_basketball_vs_alpha(Delta=11,n_file=100,n_top_teams=11,n_bottom_teams=10) # 1:15
     #plot_basketball_results(n_file=100, n_top_teams=21, n_bottom_teams=15)
-    
+
+
+
+    #sampled_perms = sample_kendal(theta=1, sigma_0=np.arange(10), n_samples=200)
+    #accuracy = top_k_accuracy(sampled_perms=sampled_perms, true_ranking=true_ranking, top_k=5)
+    #print(f"Top-k accuracy kendal: {accuracy:.4f}")
+
+    #sampled_perms = sample_PL(utilities=np.arange(10), n_samples=200)
+    #accuracy = top_k_accuracy(sampled_perms=sampled_perms, true_ranking=true_ranking, top_k=5)
+    #print(f"Top-k accuracy PL: {accuracy:.4f}")
     #plot_football_first_fold(n_file=100, n_top_teams=11, n_bottom_teams=10)
     #step 9: test the sushi preference dataset
     #log_sushi_vs_alpha(Delta=10)
@@ -51,15 +96,19 @@ if __name__ == "__main__":
 
     #step 11: test the kendal dataset
     # Example usage:`
-    true_ranking = [2,1,3,4,5,6,7,8,9,10]
-    sampled_perms = sample_mallow(sigma=np.arange(10), alpha=1, beta=1, Delta=10, n_samples=120)
-    accuracy = top_k_accuracy(sampled_perms=sampled_perms, true_ranking=true_ranking, top_k=5)
-    print(f"Top-k accuracy: {accuracy:.4f}")
+    #true_ranking = [2,1,3,4,5,6,7,8,9,10]
+    #sampled_perms = sample_mallow(sigma=np.arange(10), alpha=1, beta=1, Delta=10, n_samples=120)
+    #accuracy = top_k_accuracy(sampled_perms=sampled_perms, true_ranking=true_ranking, top_k=5)
+   # print(f"Top-k accuracy: {accuracy:.4f}")
 
-    sampled_perms = sample_kendal(theta=1, sigma_0=np.arange(10), n_samples=200)
-    accuracy = top_k_accuracy(sampled_perms=sampled_perms, true_ranking=true_ranking, top_k=5)
-    print(f"Top-k accuracy kendal: {accuracy:.4f}")
+    #sampled_perms = sample_kendal(theta=1, sigma_0=np.arange(10), n_samples=200)
+    #accuracy = top_k_accuracy(sampled_perms=sampled_perms, true_ranking=true_ranking, top_k=5)
+    #print(f"Top-k accuracy kendal: {accuracy:.4f}")
 
-    sampled_perms = sample_PL(utilities=np.arange(10), n_samples=200)
-    accuracy = top_k_accuracy(sampled_perms=sampled_perms, true_ranking=true_ranking, top_k=5)
-    print(f"Top-k accuracy PL: {accuracy:.4f}")
+    #sampled_perms = sample_PL(utilities=np.arange(10), n_samples=200)
+    #accuracy = top_k_accuracy(sampled_perms=sampled_perms, true_ranking=true_ranking, top_k=5)
+    #print(f"Top-k accuracy PL: {accuracy:.4f}")
+
+
+
+

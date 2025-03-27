@@ -27,7 +27,7 @@ def top_k_accuracy(sampled_perms, true_ranking=None, top_k=5):
         total_precision += precision_k
 
         # (Optional) print intermediate progress
-        if i % 10 == 0:
+        if i % 500 == 0:
             print(f"iter {i}: sample={predicted_perm}, top-k precision={precision_k:.4f}")
 
     # Average top-k precision across all sampled permutations

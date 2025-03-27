@@ -160,7 +160,7 @@ def sample_PL(utilities, n_samples=1000):
             chosen_items_in_order.append(chosen_item)
 
         # Reverse so that index 0 is the worst, and the last index is the best
-        chosen_items_in_order.reverse()
+        #chosen_items_in_order.reverse()
         permutations[s, :] = chosen_items_in_order
 
     return permutations

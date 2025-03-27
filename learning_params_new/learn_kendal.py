@@ -56,18 +56,17 @@ def sample_kendal(theta, sigma_0, n_samples=1000):
         you generate an insertion position in [0..len(perm)] 
         with weight propto exp(-theta*(reverse_index)).
 
-      - If you compute 'reverse_index' = (length_of_perm - position), 
-        high weight goes to positions closer to the end. 
+      - The far right of the current permutation has the highest weight.
     """
     sampled_perms = []
 
     for _ in range(n_samples):
         perm = []
         for item in sigma_0:
-            length = len(perm)  # current partial length
+            length = len(perm)
             # Compute unnormalized weights so that the *end* is favored
-            #    position goes from 0..length
-            #    reverse_index = length - position
+            # position goes from 0..length
+            # reverse_index = length - position
             weights = [math.exp(-theta * (length - k)) for k in range(length + 1)]
             total = sum(weights)
 
@@ -76,9 +75,9 @@ def sample_kendal(theta, sigma_0, n_samples=1000):
             for k, w in enumerate(weights):
                 cumsum += w
                 if r <= cumsum:
-                    perm.insert(k, item)  # Insert at position k
+                    perm.insert(k, item)
                     break
 
-        sampled_perms.append(1+np.array(perm))
+        sampled_perms.append(perm)
 
     return np.array(sampled_perms)

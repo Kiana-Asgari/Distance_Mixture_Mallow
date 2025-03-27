@@ -11,10 +11,8 @@ import matplotlib.pyplot as plt
 import sys
 
 """
-
 logging the error, best beta, best sigma for each alpha
 for each n_file and desired_teams there is a different json file
-
 
 """
 
@@ -39,18 +37,11 @@ def top_k_accuracy_basketball(n_file, n_top_teams, n_bottom_teams,
     full_rankings_test = full_rankings[test_indices]
     full_rankings_train = full_rankings[train_indices]
     
-    print(f'Train shape: {full_rankings_train.shape}, Test shape: {full_rankings_test.shape}')
     
-    pi_0_hat, theta_hat, kendal_error = learn_kendal(full_rankings_train, full_rankings_test)
-    print(f'Kendal: error: {kendal_error:3f}')
-    print("Kendal: Estimated consensus ranking (pi_0):", pi_0_hat)
-    print("Kendal: Estimated dispersion parameter (theta):", theta_hat)
-
-    theta_PL, nll_test = learn_PL(permutations_train=full_rankings_train,
-                permutations_test=full_rankings_test)
-    print(f'PL: theta: {theta_PL}')
-    print(f'PL: nll_test: {nll_test}')
-
+    sigma_0_kendal, theta_kendal, kendal_error = learn_kendal(full_rankings_train, full_rankings_test)
+    print(f"sigma_0_kendal: {sigma_0_kendal}")
+    theta_PL, nll_test = learn_PL(permutations_train=full_rankings_train, permutations_test=full_rankings_test)
+    print(f"theta_PL: {theta_PL}")
 
     """
     Reads the basketball results from the JSON file and creates a plot showing
@@ -68,33 +59,24 @@ def top_k_accuracy_basketball(n_file, n_top_teams, n_bottom_teams,
     
     # Convert data to lists for plotting
     alphas = []
-    errors = []
-    kendal_errors = []
-    
+    errors = []    
     for alpha, data in results.items():
         alphas.append(float(alpha))
         errors.append(-1 * data['error'])  # Multiply by -1 here
-        kendal_errors.append(data['kendal_error'])  # Multiply by -1 here
     
     # Find the minimum error and corresponding values
     min_error_idx = np.argmin(errors)
     min_alpha = alphas[min_error_idx]
-    min_error = errors[min_error_idx]
-
     
     # Get the corresponding data from the results
     min_alpha_key = f"{min_alpha:.6f}"
     min_data = results[min_alpha_key]
+    alpha_mallow = min_alpha
+    beta_mallow = min_data['beta']
+    sigma_mallow = min_data['sigma']
     
-    # Print the statistics
-    print("\nResults Summary:")
-    print(f"Minimum Error: {-1 * min_error:.6f} at alpha = {min_alpha:.6f}")
-    print(f"Corresponding beta: {min_data['beta']:.6f}")
-    print(f"Kendall Error: {min_data['kendal_error']:.6f}")
-    print(f"PL Error: {min_data['PL_error']:.6f}")
-    print(f"sigma: {min_data['sigma']}")
-
-
+    
+    return alpha_mallow, beta_mallow, sigma_mallow, theta_kendal, sigma_0_kendal, theta_PL
 
 
 
