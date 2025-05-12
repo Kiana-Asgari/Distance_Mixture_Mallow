@@ -5,30 +5,11 @@ from collections import defaultdict
 
 
 
-def sample_mallow(sigma, alpha, beta, n_samples=1000, Delta=10):
-    n = len(sigma)
-    sampled_perms = []
-    for iter in range(n_samples):
-        np.random.seed(iter)
-        random.seed(iter)
-        sampled_perm = sample_truncated_mallow(n, beta, alpha, Delta)
-        sampled_perm = compose_permutations(sampled_perm, sigma)
-        sampled_perms.append(sampled_perm)
-    return sampled_perms
-
-
-
-
-def compose_permutations(p, q):
-    n = len(p)
-    r = np.empty(n, dtype=int)
-    for i in range(n):
-        r[i] = p[q[i]]
-    return r
-
+#########################################################################
 # sample truncated mallow
 #########################################################################
-def sample_truncated_mallow(n, beta, alpha, Delta):
+def sample_truncated_mallow(num_samples, n, beta, alpha, Delta):
+    print('sampling truncated mallow started')
     def truncated_A(i, j):
         if j<1 or j>n:
             return 0.0
@@ -36,9 +17,15 @@ def sample_truncated_mallow(n, beta, alpha, Delta):
         if dist>Delta:
             return 0.0
         return math.exp(-beta*(dist**alpha))
+    print('building truncated assignment graph...')
     
     graph, DP, states_by_layer = build_truncated_assignment_graph(n, Delta+1, truncated_A)
-    sampled_perm = sample_permutation_from_dp(n, Delta+1, graph, DP, states_by_layer)
+    print('sampling permutations...')
+    if num_samples<100 and n:
+        sampled_perm =  [sample_permutation_from_dp_bisect(n, Delta+1, graph, DP,states_by_layer)]
+    else:
+        sampled_perm = sample_many_parallel(n, Delta+1, graph, DP, states_by_layer, num_samples=num_samples)
+    print('sampling truncated mallow finished')
     return sampled_perm
 
 
@@ -126,7 +113,7 @@ import bisect
 import random
 
 def sample_permutation_from_dp(n, k, graph, DP, states_by_layer):
-   """
+    """
     Sample a permutation from the distribution induced by the DP table.
     This version uses bisect for binary search.
     """
@@ -166,11 +153,11 @@ import concurrent.futures
 import time
 
 # Version 1: Generate multiple samples sequentially (no parallelism)
-def sample_many_sequential(n, k, graph, DP, num_samples=100):
+def sample_many_sequential(n, k, graph, DP, states_by_layer, num_samples=100):
     return [sample_permutation_from_dp_bisect(n, k, graph, DP,states_by_layer) for _ in range(num_samples)]
 
 # Version 2: Generate multiple samples in parallel using concurrent.futures
-def sample_many_parallel(n, k, graph, DP, num_samples=100, max_workers=4):
+def sample_many_parallel(n, k, graph, DP, states_by_layer, num_samples=100, max_workers=4):
     def worker(_):
         return sample_permutation_from_dp_bisect(n, k, graph, DP,states_by_layer)
     
@@ -179,21 +166,41 @@ def sample_many_parallel(n, k, graph, DP, num_samples=100, max_workers=4):
     return results
 
 
-## Example usage (on my laptop for n=20) sequential is better but for n=100 parallel is better.
-# # Benchmark both methods
-# num_samples = 100
-# # Sequential
-# start_seq = time.time()
-# seq_results = sample_many_sequential(n, k, graph, DP, num_samples)
-# end_seq = time.time()
 
-# # Parallel
-# start_par = time.time()
-# par_results = sample_many_parallel(n, k, graph, DP, num_samples, max_workers=4)
-# end_par = time.time()
+def sample_permutation_from_dp_bisect(n, k, graph, DP, states_by_layer):
+    """
+    Sample a permutation from the distribution induced by the DP table.
+    This version uses bisect for binary search.
+    """
+    final_state = ('1',) * k + ('0',) * k
+    permutation = [None] * n
+    current_state = final_state
 
-# seq_time = end_seq - start_seq
-# par_time = end_par - start_par
+    for row in range(n, 0, -1):
+        edges = graph[row][current_state]  # list of (s_old, col, w_edge)
+        
+        scores = []
+        states = []
+        cols = []
+        score_sum = 0.0
 
-# seq_time, par_time, seq_time / par_time
+        for s_old, col, w in edges:
+            dp_val = DP[row - 1, s_old]
+            sc = dp_val * w
+            if sc > 0.0:
+                score_sum += sc
+                scores.append(score_sum)
+                states.append(s_old)
+                cols.append(col)
+
+        if not scores:
+            raise ValueError(f"No valid predecessor for state={current_state} at row={row}.")
+
+        r = random.random() * score_sum
+        idx = bisect.bisect_left(scores, r)
+        permutation[row - 1] = cols[idx]
+        current_state = states[idx]
+
+    return permutation
+
     
