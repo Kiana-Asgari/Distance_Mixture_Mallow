@@ -15,7 +15,9 @@ def sample_truncated_mallow(num_samples,
                             sigma,
                             Delta=6, 
                             rng_seed=42):
-    rng = np.random.default_rng(rng_seed)
+    # Set the global random seed for consistency
+    random.seed(rng_seed)
+    np.random.seed(rng_seed)
 
     def truncated_A(i, j):
         if j<1 or j>n:
@@ -26,7 +28,7 @@ def sample_truncated_mallow(num_samples,
         return math.exp(-beta*(dist**alpha))
     
     graph, DP, states_by_layer = build_truncated_assignment_graph(n, Delta+1, truncated_A)
-    sampled_perm = sample_many_parallel(n, Delta+1, graph, DP, states_by_layer, sigma, num_samples=num_samples)
+    sampled_perm = sample_many_parallel(n, Delta+1, graph, DP, states_by_layer, sigma, num_samples=num_samples, base_seed=rng_seed)
 
     return sampled_perm
 
@@ -114,13 +116,15 @@ def dp_permanent(n, k, A):
     return total
 
 import bisect
-import random
 
-def sample_permutation_from_dp(n, k, graph, DP, states_by_layer):
+def sample_permutation_from_dp(n, k, graph, DP, states_by_layer, rng_seed=None):
     """
     Sample a permutation from the distribution induced by the DP table.
     This version uses bisect for binary search.
     """
+    # Initialize random number generator with seed if provided
+    rng = random.Random(rng_seed)
+    
     final_state = ('1',) * k + ('0',) * k
     permutation = [None] * n
     current_state = final_state
@@ -145,7 +149,7 @@ def sample_permutation_from_dp(n, k, graph, DP, states_by_layer):
         if not scores:
             raise ValueError(f"No valid predecessor for state={current_state} at row={row}.")
 
-        r = random.random() * score_sum
+        r = rng.random() * score_sum
         idx = bisect.bisect_left(scores, r)
         permutation[row - 1] = cols[idx]
         current_state = states[idx]
@@ -156,13 +160,15 @@ def sample_permutation_from_dp(n, k, graph, DP, states_by_layer):
 import concurrent.futures
 import sys
 # Version 2: Generate multiple samples in parallel using concurrent.futures
-def sample_many_parallel(n, k, graph, DP, states_by_layer, sigma, num_samples=100, max_workers=4):
-    if max_workers > 4:
-        print('max_workers must be less than 4')
+def sample_many_parallel(n, k, graph, DP, states_by_layer, sigma, num_samples=100, max_workers=6, base_seed=42):
+    if max_workers > 6:
+        print('max_workers must be less than 6')
         sys.exit()
 
     def worker(_):
-        sampled_perm = sample_permutation_from_dp_bisect(n, k, graph, DP,states_by_layer)
+        # Pass the rng_seed based on the worker index to ensure different seeds
+        worker_seed = base_seed + _
+        sampled_perm = sample_permutation_from_dp_bisect(n, k, graph, DP, states_by_layer, rng_seed=worker_seed)
         sampled_perm = _compose(sampled_perm, sigma)
         return sampled_perm
     
@@ -172,11 +178,14 @@ def sample_many_parallel(n, k, graph, DP, states_by_layer, sigma, num_samples=10
 
 
 
-def sample_permutation_from_dp_bisect(n, k, graph, DP, states_by_layer):
+def sample_permutation_from_dp_bisect(n, k, graph, DP, states_by_layer, rng_seed):
     """
     Sample a permutation from the distribution induced by the DP table.
     This version uses bisect for binary search.
     """
+    # Initialize random number generator with seed if provided
+    rng = random.Random(rng_seed)
+    
     final_state = ('1',) * k + ('0',) * k
     permutation = [None] * n
     current_state = final_state
@@ -201,7 +210,8 @@ def sample_permutation_from_dp_bisect(n, k, graph, DP, states_by_layer):
         if not scores:
             raise ValueError(f"No valid predecessor for state={current_state} at row={row}.")
 
-        r = random.random() * score_sum
+        # Use the seeded random number generator
+        r = rng.random() * score_sum
         idx = bisect.bisect_left(scores, r)
         permutation[row - 1] = cols[idx]
         current_state = states[idx]

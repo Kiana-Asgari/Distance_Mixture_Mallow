@@ -2,9 +2,9 @@ import numpy as np
 
 from GMM_diagonalized.sampling import sample_truncated_mallow
 
-def psi_m_wrapper(x, pis, sigma, num_mc, rng_seed):
+def psi_m_wrapper(x, pis, sigma, num_mc, Delta, rng_seed):
     """Wrapper for the objective function to avoid pickling issues."""
-    ψ = psi_m(pis, sigma, x[0], x[1], num_mc=num_mc, rng_seed=rng_seed)
+    ψ = psi_m(pis, sigma, x[0], x[1], num_mc=num_mc, Delta=Delta, rng_seed=rng_seed)
     return np.dot(ψ, ψ)  # scalar
 
 def psi_m(pis: np.ndarray,
@@ -12,6 +12,7 @@ def psi_m(pis: np.ndarray,
           alpha: float,
           beta:  float,
           num_mc: int = 1000,
+          Delta: int = 6,
           rng_seed: int = 42):
     
     """
@@ -54,6 +55,7 @@ def psi_m(pis: np.ndarray,
                                   beta=beta, 
                                   alpha=alpha, 
                                   sigma=sigma,
+                                  Delta=Delta,
                                   rng_seed=rng_seed)  # (num_mc, n)
     diff_mc = np.abs(mc - sigma)
     d_mc, d_dot_mc = _d_and_ddiff(diff_mc)
@@ -62,6 +64,6 @@ def psi_m(pis: np.ndarray,
 
     # ---------- assemble Ψₘ ----------
     hat_psi_m = np.array([-d_emp + d_mc, -d_dot_emp + d_dot_mc])
-    if np.abs(hat_psi_m[0]) < 0.1 or np.abs(hat_psi_m[1]) < 0.1:
+    if np.abs(hat_psi_m[0]) < 0.01 and np.abs(hat_psi_m[1]) < 0.01:
         print(f'        for alpha: {alpha}, beta: {beta}, hat_psi_m: {hat_psi_m}')
     return hat_psi_m

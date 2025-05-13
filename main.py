@@ -7,26 +7,32 @@ from MLE.consensus_ranking_estimation import consensus_ranking_estimation
 from MLE.alpha_beta_estimation import solve_alpha_beta
 from synthethic_tests.synthethic_script import save_synthetic_data
 from synthethic_tests.plot import plot_alpha_vs_n_samples, plot_beta_vs_n_samples
+from sushi_dataset.load_data import load_sushi
+from sushi_dataset.fit_sushi import fit_and_save_sushi
+from benchmark.fit_placket_luce import sample_PL, learn_PL
 
 if __name__ == "__main__":
     print('****************************Running main.py****************************')
 
-    save_synthetic_data(n=15, alpha_0=1.5, beta_0=0.5)
+    save_synthetic_data(n=10, alpha_0=1.5, beta_0=0.5, Delta=6)
     #plot_alpha_vs_n_samples(alpha_0=1.5, beta_0=0.5, n=10)
     #plot_beta_vs_n_samples(alpha_0=1.5, beta_0=0.5, n=10)
+    #sushi_data = load_sushi()
+   # print(sushi_data)
+    #fit_and_save_sushi()
     sys.exit()
-    n = 15
+    n = 10
     Delta = 6
     sigma_0 = 1+np.arange(n)
     beta_0 = 0.3
     alpha_0 = 1.5
-    num_train_samples = 300
+    num_train_samples = 1000
 
 
 
     train_samples = sample_truncated_mallow(num_samples=num_train_samples,
                                              n=n, beta=beta_0, alpha=alpha_0,
-                                            sigma=sigma_0, Delta=Delta)
+                                            sigma=sigma_0, Delta=9)
     print(f'done sampling {num_train_samples} samples')
     consensus_ranking = consensus_ranking_estimation(train_samples)
 
