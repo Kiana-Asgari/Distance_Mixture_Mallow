@@ -8,7 +8,6 @@ def consensus_ranking_estimation(pis: np.ndarray) -> np.ndarray:
         Σ_{i=1}^{n} Σ_{l=1}^{m} |π^{(l)}(i) − σ(i)|.
     The result is returned as a 1-indexed NumPy array of length n.
     """
-    print('learning central permutation started')
     pis = np.asarray(pis)
     m, n = pis.shape
     # Build cost matrix C[i, j] = Σ_l |π^{(l)}(i) − (j+1)|

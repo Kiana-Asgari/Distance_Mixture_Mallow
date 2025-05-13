@@ -154,9 +154,13 @@ def sample_permutation_from_dp(n, k, graph, DP, states_by_layer):
 
 
 import concurrent.futures
-
+import sys
 # Version 2: Generate multiple samples in parallel using concurrent.futures
 def sample_many_parallel(n, k, graph, DP, states_by_layer, sigma, num_samples=100, max_workers=4):
+    if max_workers > 4:
+        print('max_workers must be less than 4')
+        sys.exit()
+
     def worker(_):
         sampled_perm = sample_permutation_from_dp_bisect(n, k, graph, DP,states_by_layer)
         sampled_perm = _compose(sampled_perm, sigma)

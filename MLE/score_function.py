@@ -62,5 +62,6 @@ def psi_m(pis: np.ndarray,
 
     # ---------- assemble Ψₘ ----------
     hat_psi_m = np.array([-d_emp + d_mc, -d_dot_emp + d_dot_mc])
-    #print(f'for alpha: {alpha}, beta: {beta}, hat_psi_m: {hat_psi_m}')
+    if np.abs(hat_psi_m[0]) < 0.1 or np.abs(hat_psi_m[1]) < 0.1:
+        print(f'        for alpha: {alpha}, beta: {beta}, hat_psi_m: {hat_psi_m}')
     return hat_psi_m
