@@ -21,7 +21,7 @@ def _single_trial(num_samples, trial, *, n, Delta, sigma_0, beta_0, alpha_0):
         train_samples = sample_truncated_mallow(num_samples=num_samples,
                                                 n=n, beta=beta_0, alpha=alpha_0,
                                                 sigma=sigma_0, Delta=Delta,
-                                                rng_seed=num_samples * 997 + trial)
+                                                rng_seed=trial)
 
         # Estimation
         consensus = consensus_ranking_estimation(train_samples)
@@ -48,8 +48,8 @@ def save_synthetic_data(filename=None,
                         sigma_0=None,
                         beta_0=0.5,
                         alpha_0=1.5,
-                        num_train_samples=np.arange(20, 480, 5),
-                        n_trials=10,
+                        num_train_samples=np.arange(15, 350, 5),
+                        n_trials=50,
                         max_workers=16):
     """Runs all experiments in parallel and logs results to a JSON file."""
     print('****************  synthetic script running  ****************')
@@ -65,27 +65,44 @@ def save_synthetic_data(filename=None,
     if filename is None:
         base = f"estimation_{alpha_0}_{beta_0}_{n}"
         filename = os.path.join(log_dir, f"{base}.json")
-        k = 1
-        while os.path.exists(filename):
-            filename = os.path.join(log_dir, f"{base}_{k}.json")
-            k += 1
+        # No longer increment k for new filenames - use existing file if it exists
 
-    # --- Initialise JSON structure -------------------------------------
-    results = {
-        "parameters": {
+    # --- Initialize or load existing JSON structure -------------------
+    if os.path.exists(filename):
+        # Load existing results file
+        with open(filename, "r") as f:
+            results = json.load(f)
+        print(f"Loaded existing results from {filename}")
+        
+        # Update parameters if needed
+        results["parameters"].update({
             "n": n,
             "Delta": Delta,
             "sigma_0": sigma_0.tolist(),
             "beta_0": beta_0,
             "alpha_0": alpha_0,
             "n_trials": n_trials,
-            "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        },
-        "trials": {}
-    }
+            "last_updated": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        })
+    else:
+        # Create new results structure
+        results = {
+            "parameters": {
+                "n": n,
+                "Delta": Delta,
+                "sigma_0": sigma_0.tolist(),
+                "beta_0": beta_0,
+                "alpha_0": alpha_0,
+                "n_trials": n_trials,
+                "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            },
+            "trials": {}
+        }
+        print(f"Created new results structure for {filename}")
+
+    # Write initial structure to file
     with open(filename, "w") as f:
         json.dump(results, f, indent=2)
-    print(f"Initial results structure saved to {filename}")
 
     # -----------------------------------------------------------------
     # Submit every (num_samples, trial) to the process pool

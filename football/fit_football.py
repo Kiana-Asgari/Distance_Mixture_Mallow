@@ -1,25 +1,40 @@
-from sushi_dataset.load_data import load_sushi
 from MLE.consensus_ranking_estimation import consensus_ranking_estimation
 from MLE.alpha_beta_estimation import solve_alpha_beta
 import numpy as np
-from numpy.random import default_rng
 import json
 import os
 import sys
+from numpy.random import default_rng
+
 from MLE.top_k import soft_top_k, soft_top_k_PL, soft_top_k_kendal
 from benchmark.fit_placket_luce import sample_PL, learn_PL
 from benchmark.fit_Mallow_kendal import learn_kendal
+from football.load_football import load_data, get_top_teams, get_full_rankings
+"""
+logging the error, best beta, best sigma for each alpha
+for each n_file and desired_teams there is a different json file
 
-def fit_and_save_sushi(seed=42):
+"""
 
-    sushi_data = load_sushi()    
+def fit_football(n_file, n_top_teams=11, n_bottom_teams=10, 
+                                   Delta=7, seed=42):
+    np.random.seed(seed)  # For reproducibility
+
+    teams, votes_dict = load_data(limit=n_file)
+
+    top_teams = get_top_teams(teams, votes_dict)
+    desired_teams = 1+np.concatenate([top_teams[1:n_top_teams], top_teams[-n_bottom_teams:-5]])
+    football_data = get_full_rankings(teams, votes_dict, which_team_to_keep = desired_teams)
+    print(f'football_data: {football_data.shape}')
+    
+
     num_trials = 10
-    train_size = 3500
+    train_size = 1000
     Delta = 7
-    results_file = 'sushi_dataset/results/sushi_fit_results.json'
+    results_file = f'football/results/football_fit_results_{n_file}_{n_top_teams}_{n_bottom_teams}.json'
     
     # Create directory if it doesn't exist
-    os.makedirs('sushi_dataset/results', exist_ok=True)
+    os.makedirs('football/results', exist_ok=True)
     
     # Check if results file exists and load existing results
     if os.path.exists(results_file):
@@ -37,7 +52,7 @@ def fit_and_save_sushi(seed=42):
             
         print(f"Running trial {trial+1} of {num_trials}")
         
-        train_data, test_data, train_indices, test_indices = train_split(sushi_data, train_size, trial + seed)
+        train_data, test_data, train_indices, test_indices = train_split(football_data, train_size, trial + seed)
         
         # Fit consensus ranking
         sigma_0 = consensus_ranking_estimation(train_data)
@@ -103,4 +118,11 @@ def train_split(sushi_data, train_size, seed):
     train_data = sushi_data[train_indices]
     test_data = sushi_data[test_indices]
     return train_data, test_data, train_indices, test_indices
+
+    
+    
+   
+    
+    
+
 

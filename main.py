@@ -9,17 +9,24 @@ from synthethic_tests.synthethic_script import save_synthetic_data
 from synthethic_tests.plot import plot_alpha_vs_n_samples, plot_beta_vs_n_samples
 from sushi_dataset.load_data import load_sushi
 from sushi_dataset.fit_sushi import fit_and_save_sushi
-from benchmark.fit_placket_luce import sample_PL, learn_PL
-
+from basketball.plot_bascketball import plot_model_comparisons_basketball
+from football.plot_football import plot_model_comparisons_football
+from sushi_dataset.plots import plot_model_comparisons_sushi
+from football.fit_football import fit_football
+from basketball.fit_bascketball import fit_basketball
 if __name__ == "__main__":
     print('****************************Running main.py****************************')
 
-    save_synthetic_data(n=10, alpha_0=1.5, beta_0=0.5, Delta=6)
-    #plot_alpha_vs_n_samples(alpha_0=1.5, beta_0=0.5, n=10)
-    #plot_beta_vs_n_samples(alpha_0=1.5, beta_0=0.5, n=10)
+    #save_synthetic_data(n=10, alpha_0=1.5, beta_0=0.5, Delta=6)
+    plot_alpha_vs_n_samples(alpha_0=1.5, beta_0=0.5, n=10)
+    plot_beta_vs_n_samples(alpha_0=1.5, beta_0=0.5, n=10)
     #sushi_data = load_sushi()
    # print(sushi_data)
     #fit_and_save_sushi()
+    #fit_basketball(n_file=100)
+    fit_basketball(n_file=100,n_top_teams=21,n_bottom_teams=15,Delta=7,seed=42)
+    #plot_model_comparisons()
+    #plot_model_comparisons_sushi()
     sys.exit()
     n = 10
     Delta = 6
