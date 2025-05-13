@@ -31,3 +31,6 @@ def brute_force_permanent(matrix):
         perm_sum += prod
     return perm_sum
 
+
+
+

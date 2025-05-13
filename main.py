@@ -14,12 +14,21 @@ from football.plot_football import plot_model_comparisons_football
 from sushi_dataset.plots import plot_model_comparisons_sushi
 from football.fit_football import fit_football
 from basketball.fit_bascketball import fit_basketball
+from plotting_utils import plot_marginal_heamap
 if __name__ == "__main__":
     print('****************************Running main.py****************************')
+    plot_marginal_heamap(n=10, alpha=1, beta=0.25, Delta=9)
+    plot_marginal_heamap(n=10, alpha=1, beta=0.25, Delta=7)
+    plot_marginal_heamap(n=10, alpha=1, beta=0.25, Delta=6)
+    plot_marginal_heamap(n=10, alpha=1, beta=0.25, Delta=5)
+    plot_marginal_heamap(n=10, alpha=1, beta=0.25, Delta=4)
+    plot_marginal_heamap(n=10, alpha=1, beta=0.25, Delta=3)
+    plot_marginal_heamap(n=10, alpha=1, beta=0.25, Delta=2)
+    plot_marginal_heamap(n=10, alpha=1, beta=0.25, Delta=1)
 
     #save_synthetic_data(n=10, alpha_0=1.5, beta_0=0.5, Delta=6)
-    plot_alpha_vs_n_samples(alpha_0=1.5, beta_0=0.5, n='15(main)')
-    plot_beta_vs_n_samples(alpha_0=1.5, beta_0=0.5, n='15(main)')
+    #plot_alpha_vs_n_samples(alpha_0=1.5, beta_0=0.5, n='15(main)')
+   # plot_beta_vs_n_samples(alpha_0=1.5, beta_0=0.5, n='15(main)')
     #sushi_data = load_sushi()
    # print(sushi_data)
     #fit_and_save_sushi()
