@@ -8,8 +8,15 @@ from collections import defaultdict
 #########################################################################
 # sample truncated mallow
 #########################################################################
-def sample_truncated_mallow(num_samples, n, beta, alpha, Delta):
-    print('sampling truncated mallow started')
+def sample_truncated_mallow(num_samples, 
+                            n, 
+                            beta, 
+                            alpha, 
+                            sigma,
+                            Delta=6, 
+                            rng_seed=42):
+    rng = np.random.default_rng(rng_seed)
+
     def truncated_A(i, j):
         if j<1 or j>n:
             return 0.0
@@ -17,19 +24,16 @@ def sample_truncated_mallow(num_samples, n, beta, alpha, Delta):
         if dist>Delta:
             return 0.0
         return math.exp(-beta*(dist**alpha))
-    print('building truncated assignment graph...')
     
     graph, DP, states_by_layer = build_truncated_assignment_graph(n, Delta+1, truncated_A)
-    print('sampling permutations...')
-    if num_samples<100 and n:
-        sampled_perm =  [sample_permutation_from_dp_bisect(n, Delta+1, graph, DP,states_by_layer)]
-    else:
-        sampled_perm = sample_many_parallel(n, Delta+1, graph, DP, states_by_layer, num_samples=num_samples)
-    print('sampling truncated mallow finished')
+    sampled_perm = sample_many_parallel(n, Delta+1, graph, DP, states_by_layer, sigma, num_samples=num_samples)
+
     return sampled_perm
 
 
 
+#########################################################################
+# build truncated assignment graph
 #########################################################################
 def build_truncated_assignment_graph(n, k, A):
     """
@@ -150,16 +154,13 @@ def sample_permutation_from_dp(n, k, graph, DP, states_by_layer):
 
 
 import concurrent.futures
-import time
-
-# Version 1: Generate multiple samples sequentially (no parallelism)
-def sample_many_sequential(n, k, graph, DP, states_by_layer, num_samples=100):
-    return [sample_permutation_from_dp_bisect(n, k, graph, DP,states_by_layer) for _ in range(num_samples)]
 
 # Version 2: Generate multiple samples in parallel using concurrent.futures
-def sample_many_parallel(n, k, graph, DP, states_by_layer, num_samples=100, max_workers=4):
+def sample_many_parallel(n, k, graph, DP, states_by_layer, sigma, num_samples=100, max_workers=4):
     def worker(_):
-        return sample_permutation_from_dp_bisect(n, k, graph, DP,states_by_layer)
+        sampled_perm = sample_permutation_from_dp_bisect(n, k, graph, DP,states_by_layer)
+        sampled_perm = _compose(sampled_perm, sigma)
+        return sampled_perm
     
     with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
         results = list(executor.map(worker, range(num_samples)))
@@ -204,3 +205,14 @@ def sample_permutation_from_dp_bisect(n, k, graph, DP, states_by_layer):
     return permutation
 
     
+
+
+
+#########################################################################
+def _compose(perm, sigma):
+    # convert to 0-based NumPy arrays
+    perm = np.asarray(perm, dtype=np.int64) - 1
+    sigma = np.asarray(sigma, dtype=np.int64) - 1
+    # vectorised gather: r(i) = p[ q[i] ]
+    r = perm[sigma]
+    return (r + 1).tolist() 

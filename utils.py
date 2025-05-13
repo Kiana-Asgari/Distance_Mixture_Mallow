@@ -18,10 +18,6 @@ def distance_alpha_batch(perms, sigma, alpha):
     distance_matrix = (np.abs(perms - sigma))**alpha
     return np.sum(distance_matrix, axis=1)
 
-
-
-
-
 # Brute Force Permanent Calculation
 from itertools import permutations
 def brute_force_permanent(matrix):

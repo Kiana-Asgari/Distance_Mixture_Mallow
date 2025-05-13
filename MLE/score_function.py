@@ -1,75 +1,66 @@
 import numpy as np
-from scipy.optimize import root
 
+from GMM_diagonalized.sampling import sample_truncated_mallow
 
+def psi_m_wrapper(x, pis, sigma, num_mc, rng_seed):
+    """Wrapper for the objective function to avoid pickling issues."""
+    ψ = psi_m(pis, sigma, x[0], x[1], num_mc=num_mc, rng_seed=rng_seed)
+    return np.dot(ψ, ψ)  # scalar
 
+def psi_m(pis: np.ndarray,
+          sigma: np.ndarray,
+          alpha: float,
+          beta:  float,
+          num_mc: int = 1000,
+          rng_seed: int = 42):
+    
+    """
+    Compute Ψₘ(α,β;σ)  for m empirical permutations `pis`
+    and central permutation `sigma`.
 
-from GMM_diagonalized.sampling import sample_many_parallel
+    Parameters
+    ----------
+    pis      : (m, n) int array – sampled permutations π^{(1)},…,π^{(m)}
+    sigma    : (n,)   int array – the central permutation σ̂
+    alpha    : distance exponent α  (>0)
+    beta     : Mallow scale β       (passed to the sampler)
+    num_mc   : Monte-Carlo sample size for the expectations
 
+    Returns
+    -------
+    np.ndarray shape (2,) with the two components of Ψₘ.
+    """
+    pis   = np.asarray(pis,   dtype=np.int16)
+    sigma = np.asarray(sigma, dtype=np.int16)
 
-# ----------------------------------------------------------------------
-#  Distance statistics -------------------------------------------------
-# ----------------------------------------------------------------------
-def _d_alpha(batch: np.ndarray, sigma: np.ndarray, alpha: float) -> np.ndarray:
-    diff = np.abs(batch - sigma)            
-    return np.sum(diff ** alpha, axis=-1)
+    # ---------- helper: d_α and ẟd_α in one pass ----------
+    def _d_and_ddiff(diff):
+        """Return (d_α, ẟd_α) for |π−σ| array `diff` (any shape[..., n])."""
+        diff_f  = diff.astype(float)
+        diff_a  = diff_f ** alpha
+        with np.errstate(divide='ignore'):          # 0·log0 → 0
+            d_dot = diff_a * np.where(diff == 0, 0, np.log(diff_f))
+        return diff_a.sum(-1), d_dot.sum(-1)
 
-def _dot_d_alpha(batch: np.ndarray, sigma: np.ndarray, alpha: float) -> np.ndarray:
-    diff = np.abs(batch - sigma)
-    pow_ = diff ** alpha
-    return np.sum(np.log(np.maximum(diff, 1)) * pow_, axis=-1)
+    # ---------- empirical part ----------
+    diff_emp = np.abs(pis - sigma)                  # (m, n)
+    d_emp, d_dot_emp = _d_and_ddiff(diff_emp)
+    d_emp      = d_emp.mean()                       # 1/m Σ d_α
+    d_dot_emp  = d_dot_emp.mean()                   # 1/m Σ ẟd_α
 
-# ----------------------------------------------------------------------
-#  Moment-equation (score) ---------------------------------------------
-# ----------------------------------------------------------------------
-def _psi(u: np.ndarray,
-         training_data: np.ndarray,
-         sigma: np.ndarray,
-         m_exp: int = 512,
-         rng: np.random.Generator = np.random.default_rng()) -> np.ndarray:
+    # ---------- expectation (Monte-Carlo) ----------
+    mc = sample_truncated_mallow(num_samples=num_mc, 
+                                  n=len(sigma), 
+                                  beta=beta, 
+                                  alpha=alpha, 
+                                  sigma=sigma,
+                                  rng_seed=rng_seed)  # (num_mc, n)
+    diff_mc = np.abs(mc - sigma)
+    d_mc, d_dot_mc = _d_and_ddiff(diff_mc)
+    d_mc     = d_mc.mean()
+    d_dot_mc = d_dot_mc.mean()
 
-    alpha = 1.0 + np.exp(u[0])
-    beta  = 1e-5 + np.exp(u[1])
-
-    # sample averages ---------------------------------------------------
-    d_emp   = _d_alpha(training_data, sigma, alpha).mean()
-    dd_emp  = _d_alpha(training_data, sigma, alpha).mean()
-
-    # Monte-Carlo expectation under P_{α,β}^{Δ} -------------------------
-    population_data   = sample_many_parallel(m_exp, alpha, beta, rng)        # shape (m_exp,d)
-    d_mod   = _d_alpha(population_data,  sigma, alpha).mean()
-    dd_mod  = _d_alpha(population_data, sigma, alpha).mean()
-
-    return np.asarray([d_emp - d_mod, dd_emp - dd_mod])
-
-# ----------------------------------------------------------------------
-#  Public wrapper ------------------------------------------------------
-# ----------------------------------------------------------------------
-def fit_mallows(training_data: np.ndarray,
-                sigma: np.ndarray,
-                x0=(0.0, 0.0),
-                m_exp: int = 512,
-                tol: float = 1e-6) -> tuple[float, float]:
-
-    sol = root(_psi, x0,
-               args=(training_data, sigma, m_exp),
-               method='hybr', tol=tol)
-
-    if not sol.success:
-        raise RuntimeError(sol.message)
-
-    alpha_hat = 1.0 + np.exp(sol.x[0])
-    beta_hat  = 1e-5 + np.exp(sol.x[1])
-    return alpha_hat, beta_hat
-
-# ----------------------------------------------------------------------
-#  Example usage -------------------------------------------------------
-if __name__ == "__main__":
-    n, d = 2000, 50
-    rng  = np.random.default_rng(123)
-    sigma = np.arange(d)                        # identity permutation
-    data  = rng.permutation(np.tile(sigma, (n,1)))   # fake data
-
-    # Fit ---------------------------------------------------------------
-    alpha_hat, beta_hat = fit_mallows(data, sigma)
-    print(f"α̂ = {alpha_hat:.4f},  β̂ = {beta_hat:.4f}")
+    # ---------- assemble Ψₘ ----------
+    hat_psi_m = np.array([-d_emp + d_mc, -d_dot_emp + d_dot_mc])
+    #print(f'for alpha: {alpha}, beta: {beta}, hat_psi_m: {hat_psi_m}')
+    return hat_psi_m
