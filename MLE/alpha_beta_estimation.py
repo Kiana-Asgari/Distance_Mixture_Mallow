@@ -34,7 +34,7 @@ def solve_alpha_beta_grid(pis, sigma,
                           grid_N   = 64,      # Increased from 30
                           tol_root = 1e-1,    # Tighter tolerance
                           rng_seed = None,
-                          workers  = -1,
+                          workers  = 1,
                           finish_method = 'BFGS'):  # Add local optimization
     """
     Exhaustive grid search with SciPy.optimize.brute (supports workers≥1).
@@ -62,7 +62,7 @@ def solve_alpha_beta_grid(pis, sigma,
         print("[Warning] Grid search did not locate a root within tolerance", tol_root)
     return np.array([α_hat, β_hat])
 
-
+import sys
 def solve_alpha_beta(pis, sigma,
                      alpha_bounds=(1.0, 3.0),
                      beta_bounds =(1e-3, 3.0),
@@ -79,6 +79,9 @@ def solve_alpha_beta(pis, sigma,
     np.ndarray([α̂, β̂])
     """
     bounds = [alpha_bounds, beta_bounds]
+    max_workers = 16
+    if max_workers > 16:
+        sys.exit('max_workers must be less than 8')
 
     # Use a function with args instead of a lambda
     res = differential_evolution(
@@ -94,7 +97,7 @@ def solve_alpha_beta(pis, sigma,
         #recombination = 0.9,
         polish        = True,        # we'll replace polish with LS below
         updating      = "deferred",
-        workers       = -1            # all CPU cores
+        workers       = max_workers            # all CPU cores
     )
 
     α_hat, β_hat = res.x  
