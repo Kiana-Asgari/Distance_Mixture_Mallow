@@ -30,7 +30,7 @@ def fit_basketball(n_file, n_top_teams=11, n_bottom_teams=10,
 
     num_trials = 10
     train_size = 1000
-    Delta = 6
+    #Delta = 6
     results_file = f'basketball/results/basketball_fit_results_{n_file}_{n_top_teams}_{n_bottom_teams}_{Delta}.json'
     
     # Create directory if it doesn't exist

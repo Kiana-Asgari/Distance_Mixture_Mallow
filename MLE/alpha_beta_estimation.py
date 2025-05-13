@@ -67,7 +67,7 @@ def solve_alpha_beta(pis, sigma, Delta,
                      alpha_bounds=(1.0-1e-4, 2.0),
                      beta_bounds =(1e-4, 2.0),
                      *,
-                     num_mc      = 4000,   # high-precision MC only for the final polish
+                     num_mc      = 300,   # high-precision MC only for the final polish
                      maxiter     = 10,      # few generations are enough
                      popsize     = 50,     # small population → fast
                      mutation    = (0.5, 1),  # Smaller mutation range for finer steps
