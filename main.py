@@ -3,14 +3,31 @@ import sys
 import time
 
 from GMM_diagonalized.sampling import sample_truncated_mallow
-
-
+from MLE.consensus_ranking_estimation import consensus_ranking_estimation
+from MLE.alpha_beta_estimation import solve_alpha_beta
+from synthethic_tests.synthethic_script import save_synthetic_data
 
 if __name__ == "__main__":
     print('****************************Running main.py****************************')
 
+    save_synthetic_data()
 
-    seq_results = sample_truncated_mallow(num_samples=1, n=30, beta=0.5, alpha=1.0, Delta=6)
+    sys.exit()
+    n = 15
+    Delta = 6
+    sigma_0 = 1+np.arange(n)
+    beta_0 = 0.3
+    alpha_0 = 1.5
+    num_train_samples = 300
 
 
 
+    train_samples = sample_truncated_mallow(num_samples=num_train_samples,
+                                             n=n, beta=beta_0, alpha=alpha_0,
+                                            sigma=sigma_0, Delta=Delta)
+    print(f'done sampling {num_train_samples} samples')
+    consensus_ranking = consensus_ranking_estimation(train_samples)
+
+    print(f'done estimating consensus ranking: {consensus_ranking}')
+    params = solve_alpha_beta(train_samples, consensus_ranking)
+    print('alpha beta estimation finished', params)
