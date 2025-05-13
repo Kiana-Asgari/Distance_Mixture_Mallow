@@ -68,7 +68,7 @@ def solve_alpha_beta(pis, sigma, Delta,
                      beta_bounds =(1e-4, 2.0),
                      *,
                      num_mc      = 4000,   # high-precision MC only for the final polish
-                     maxiter     = 15,      # few generations are enough
+                     maxiter     = 10,      # few generations are enough
                      popsize     = 50,     # small population → fast
                      mutation    = (0.5, 1),  # Smaller mutation range for finer steps
                      recombination = 0.9,    # Higher recombination for better local search
@@ -95,9 +95,9 @@ def solve_alpha_beta(pis, sigma, Delta,
         #popsize       = popsize,
         #mutation      = mutation,
         #recombination = 0.9,
-        polish        = True,        # we'll replace polish with LS below
-        updating      = "deferred",
-        workers       = max_workers            # all CPU cores
+        #polish        = True,        # we'll replace polish with LS below
+        #updating      = "deferred",
+        workers       = max_workers           
     )
 
     α_hat, β_hat = res.x  

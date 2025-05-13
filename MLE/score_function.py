@@ -7,6 +7,7 @@ def psi_m_wrapper(x, pis, sigma, num_mc, Delta, rng_seed):
     ψ = psi_m(pis, sigma, x[0], x[1], num_mc=num_mc, Delta=Delta, rng_seed=rng_seed)
     return np.dot(ψ, ψ)  # scalar
 
+
 def psi_m(pis: np.ndarray,
           sigma: np.ndarray,
           alpha: float,
@@ -64,6 +65,6 @@ def psi_m(pis: np.ndarray,
 
     # ---------- assemble Ψₘ ----------
     hat_psi_m = np.array([-d_emp + d_mc, -d_dot_emp + d_dot_mc])
-    if np.abs(hat_psi_m[0]) < 0.01 and np.abs(hat_psi_m[1]) < 0.01:
-        print(f'        for alpha: {alpha}, beta: {beta}, hat_psi_m: {hat_psi_m}')
+    #if np.abs(hat_psi_m[0]) < 3 and np.abs(hat_psi_m[1]) < 3:
+    print(f'        for alpha: {alpha}, beta: {beta}, hat_psi_m: {hat_psi_m}')
     return hat_psi_m
