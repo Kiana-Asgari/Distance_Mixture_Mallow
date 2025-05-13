@@ -25,7 +25,7 @@ def _single_trial(num_samples, trial, *, n, Delta, sigma_0, beta_0, alpha_0):
 
         # Estimation
         consensus = consensus_ranking_estimation(train_samples)
-        alpha_hat, beta_hat = solve_alpha_beta(train_samples, consensus)
+        alpha_hat, beta_hat = solve_alpha_beta(train_samples, consensus, Delta=Delta)
 
         return {
             "num_samples": num_samples,
@@ -50,7 +50,7 @@ def save_synthetic_data(filename=None,
                         alpha_0=1.5,
                         num_train_samples=np.arange(20, 480, 5),
                         n_trials=10,
-                        max_workers=8):
+                        max_workers=16):
     """Runs all experiments in parallel and logs results to a JSON file."""
     print('****************  synthetic script running  ****************')
 
@@ -99,8 +99,7 @@ def save_synthetic_data(filename=None,
 
     # --- Ensure max_workers never exceeds 4 ---------------------------
     print(f"Using {max_workers} workers to avoid overload.")
-    if max_workers > 8:
-        sys.exit('max_workers must be less than 4')
+
 
     try:
         with ProcessPoolExecutor(max_workers=max_workers) as pool:

@@ -63,11 +63,11 @@ def solve_alpha_beta_grid(pis, sigma,
     return np.array([α_hat, β_hat])
 
 import sys
-def solve_alpha_beta(pis, sigma,
-                     alpha_bounds=(1.0, 3.0),
-                     beta_bounds =(1e-3, 3.0),
+def solve_alpha_beta(pis, sigma, Delta,
+                     alpha_bounds=(1.0-1e-4, 2.0),
+                     beta_bounds =(1e-4, 2.0),
                      *,
-                     num_mc      = 2500,   # high-precision MC only for the final polish
+                     num_mc      = 4000,   # high-precision MC only for the final polish
                      maxiter     = 15,      # few generations are enough
                      popsize     = 50,     # small population → fast
                      mutation    = (0.5, 1),  # Smaller mutation range for finer steps
@@ -79,16 +79,16 @@ def solve_alpha_beta(pis, sigma,
     np.ndarray([α̂, β̂])
     """
     bounds = [alpha_bounds, beta_bounds]
-    max_workers = 16
-    if max_workers > 16:
-        sys.exit('max_workers must be less than 8')
+    max_workers = 32
+    if max_workers >32:
+        sys.exit('max_workers must be less than 20')
 
     # Use a function with args instead of a lambda
     res = differential_evolution(
         psi_m_wrapper,
         bounds,
-        args=(pis, sigma, num_mc, rng_seed),   # cheap MC here
-        seed          = rng_seed,
+        args=(pis, sigma, num_mc, Delta, 42),   # cheap MC here
+        seed          = 42,
         #strategy      = "rand1bin",
         tol           = 5*1e-1,
         maxiter       = maxiter,
