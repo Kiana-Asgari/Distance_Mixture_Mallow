@@ -5,47 +5,41 @@ from typing import Callable, Sequence, Tuple, List
 from benchmark.fit_placket_luce import sample_PL
 from scipy.stats import kendalltau
 from benchmark.fit_Mallow_kendal import sample_kendal
-
 def soft_top_k_kendal(test_set, theta_hat, pi_0, num_mc=20_000):
-    samples = sample_kendal(num_samples=num_mc, theta=theta_hat, sigma_0=pi_0)
-    # Convert samples to numpy array if it's not already
-    samples = 1 + np.array(samples)
-    print('   kendal samples', samples[0])
-    
+    samples = 1 + np.array(sample_kendal(num_samples=num_mc, theta=theta_hat, sigma_0=pi_0))
+    print('kendal samples:', samples[0])
+
     n = len(pi_0)
-    # compute a list of length n, the probability that the i th position in the test set is in the top 1 of the samples
-    top_1_marginal = [np.sum(samples[:, 0] == i)/ len(samples) for i in range(1, n+1)] 
+    top_1_marginal = [np.sum(samples[:, 0] == i) / len(samples) for i in range(1, n+1)]
+
     hit_rate_list = []
     for k in range(1, n+1):
-        hit = 0
-        for test_ranking in test_set:
-            for position in range(k):
-                hit += top_1_marginal[test_ranking[position]-1] # raked 1 in the test set
+        hit = sum(top_1_marginal[test_ranking[position]-1] for test_ranking in test_set for position in range(k))
         hit_rate_list.append(hit / len(test_set))
+
     distances = distance_metrics(test_set, samples)
     ndcg = ndcg_at_k(test_set, samples)
-    return hit_rate_list, distances, ndcg
+    pairwise_acc = pairwise_accuracy(test_set, samples)
 
+    return hit_rate_list, distances, ndcg, pairwise_acc
 
+# Soft top-k metrics with pairwise accuracy for Plackett–Luce model
 def soft_top_k_PL(test_set, utilities, num_mc=20_000):
-    samples = 1+sample_PL(utilities, 20_000)
-    # Convert samples to numpy array if it's not already
-    samples = np.array(samples)
-    
+    samples = 1 + np.array(sample_PL(utilities, num_mc))
+
     n = len(utilities)
-    # compute a list of length n, the probability that the i th position in the test set is in the top 1 of the samples
-    top_1_marginal = [np.sum(samples[:, 0] == i)/ len(samples) for i in range(1, n+1)] 
+    top_1_marginal = [np.sum(samples[:, 0] == i) / len(samples) for i in range(1, n+1)]
+
     hit_rate_list = []
     for k in range(1, n+1):
-        hit = 0
-        for test_ranking in test_set:
-            for position in range(k):
-                hit += top_1_marginal[test_ranking[position]-1] # raked 1 in the test set
+        hit = sum(top_1_marginal[test_ranking[position]-1] for test_ranking in test_set for position in range(k))
         hit_rate_list.append(hit / len(test_set))
+
     distances = distance_metrics(test_set, samples)
     ndcg = ndcg_at_k(test_set, samples)
-    return hit_rate_list, distances, ndcg
+    pairwise_acc = pairwise_accuracy(test_set, samples)
 
+    return hit_rate_list, distances, ndcg, pairwise_acc
 
 def soft_top_k(test_set, alpha_hat, beta_hat, sigma_hat, Delta=None, rng_seed=None, num_mc=20_000):
     samples = sample_truncated_mallow(num_samples=num_mc, 
@@ -289,4 +283,74 @@ def ndcg_at_k(test_perms, sampled_perms, k: int = 5) -> float:
 
     # ------------------------------------------------------------------ #
     return ndcg.mean()
-    
+
+def precision_recall_at_k(test_set, sampled_set, k=5):
+    test_top_k = [set(perm[:k]) for perm in test_set]
+    sampled_top_k = set(np.argsort(-np.bincount(sampled_set[:, :k].flatten()))[:k] + 1)
+
+    precisions = [len(sampled_top_k & t_top) / k for t_top in test_top_k]
+    recalls = [len(sampled_top_k & t_top) / len(t_top) for t_top in test_top_k]
+
+    return np.mean(precisions), np.mean(recalls)
+
+
+def top_k_overlap(test_set, sampled_set, k=5):
+    test_top_k = [set(perm[:k]) for perm in test_set]
+    sampled_top_k = set(np.argsort(-np.bincount(sampled_set[:, :k].flatten()))[:k] + 1)
+
+    overlaps = [len(sampled_top_k & t_top) / len(sampled_top_k | t_top) for t_top in test_top_k]
+
+    return np.mean(overlaps)
+
+
+def pairwise_accuracy(test_set, sampled_set):
+    n_items = test_set.shape[1]
+    pairs = [(i, j) for i in range(n_items) for j in range(i+1, n_items)]
+
+    def concordance(pair, perms):
+        i, j = pair
+        return np.mean((perms[:, i] < perms[:, j]).astype(float))
+
+    sampled_concordances = np.array([concordance(pair, sampled_set) for pair in pairs])
+    test_concordances = np.array([concordance(pair, test_set) for pair in pairs])
+
+    accuracy = 1.0 - np.abs(sampled_concordances - test_concordances).mean()
+
+    return accuracy
+
+
+def evaluate_in_sample_metrics(train_set, alpha_hat, beta_hat, sigma_hat, Delta=7, rng_seed=5, num_mc=20_000):
+    # Generate Monte Carlo samples from the estimated model
+    samples = sample_truncated_mallow(num_samples=num_mc,
+                                      n=len(sigma_hat),
+                                      beta=beta_hat,
+                                      alpha=alpha_hat,
+                                      sigma=sigma_hat,
+                                      Delta=Delta,
+                                      rng_seed=rng_seed)
+    samples = np.array(samples)
+
+    # Compute metrics in-sample (train set vs. MC samples)
+    hit_rate_list, distances, ndcg = soft_top_k(train_set, alpha_hat, beta_hat, sigma_hat,
+                                                Delta=Delta, rng_seed=rng_seed, num_mc=num_mc)
+
+    print(f"In-sample Hit Rate: {hit_rate_list}")
+    print(f"In-sample Kendall tau: {distances[0]}")
+    print(f"In-sample Hamming Distance: {distances[1]}")
+    print(f"In-sample Spearman rho: {distances[2]}")
+    print(f"In-sample Cayley Distance: {distances[3]}")
+    print(f"In-sample NDCG: {ndcg}")
+    acc=  pairwise_accuracy(train_set, samples)
+    print("pairwise accuracy",acc)
+    print("top_k_overlap", top_k_overlap(train_set, samples))
+    print("precision_recall_at_k", precision_recall_at_k(train_set, samples))
+
+    return {
+        "hit_rate": hit_rate_list,
+        "kendall_tau": distances[0],
+        "hamming_distance": distances[1],
+        "spearman_rho": distances[2],
+        "cayley_distance": distances[3],
+        "ndcg": ndcg,
+        "acc":acc
+    }

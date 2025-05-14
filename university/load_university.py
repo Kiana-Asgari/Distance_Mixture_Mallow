@@ -6,7 +6,7 @@ import numpy as np
 file_list_url = (
     "https://api.github.com/repos/"
     "n-boehmer/Collecting-Classifying-Analyzing-and-Using-Real-World-Elections"
-    "/contents/complete/football%20week"
+    "/contents/complete/university%20ranking"
 )
 
 # 2. This is the base URL for the **raw** GitHub content of each .soc file.
@@ -15,7 +15,7 @@ file_list_url = (
 base_raw_url = (
     "https://raw.githubusercontent.com/"
     "n-boehmer/Collecting-Classifying-Analyzing-and-Using-Real-World-Elections/"
-    "main/complete/football%20week/"
+    "main/complete/university%20ranking/"
 )
 
 def fetch_file_list(limit=10):
@@ -95,7 +95,7 @@ def unify_teams_and_votes(file_names):
 
     return team_mapping, unified_teams, unified_votes
 
-def load_data(limit=10):
+def load_data(limit=5):
     # 1. Get the file list from GitHub.
     file_names = fetch_file_list(limit)
     if not file_names:
@@ -105,16 +105,7 @@ def load_data(limit=10):
     # 2. Unify the teams and votes.
     team_mapping, unified_teams, all_votes = unify_teams_and_votes(file_names)
 
-    # 3. Print out the mapping and the new votes.
-    #print("Unified Team Mapping:")
-    ##for team, number in team_mapping.items():
-    #    print(f"{number}: {team}")
 
-    #print("\nUnified Votes (by file):")
-    #for file_name, votes in all_votes.items():
-    #    print(f"\nFile: {file_name}")
-    #    for vote in votes:
-    #        print("  ", vote)
     return  unified_teams, all_votes
 
 
@@ -137,12 +128,13 @@ def get_full_rankings(teams, votes_dict, which_team_to_keep=None):
             
             # Adjust the filtered vote to be a ranking from 0 to len(which_team_to_keep) - 1
             adjusted_vote = [team_to_new_index[team] for team in filtered_vote]
-            if len(np.unique(adjusted_vote)) == len(which_team_to_keep) and\
-                                                len(adjusted_vote) == len(which_team_to_keep):
+            if  len(adjusted_vote) == len(which_team_to_keep):
                 full_rankings.append(adjusted_vote)
 
 
     return np.array(full_rankings)
+
+
 
 
 def get_top_teams_borda(teams, votes_dict, top_n=20):
@@ -159,38 +151,6 @@ def get_top_teams_borda(teams, votes_dict, top_n=20):
             scores[team - 1] += num_teams - rank  # higher rank gives higher score
 
     # Get indices sorted by scores (descending)
-    top_team_indices = np.argsort(scores)[::-1]#[:top_n]
+    top_team_indices = np.argsort(scores)[::-1][:top_n]
 
     return top_team_indices
-
-
-
-def get_top_teams(teams, votes_dict, top_n=20):
-
-    votes=[] 
-    for key in votes_dict.keys():
-        votes+=votes_dict[key]
-    num_teams=len(teams)
-    rank_probabilities = np.zeros((num_teams, num_teams))
-    # --------------------------------------
-    # 2) Process Votes
-    # --------------------------------------
-    for vote in votes:
-        for rank, team in enumerate(vote):
-            rank_probabilities[team - 1, rank] += 1  # Adjust for 0-based indexing
-    #rank_probabilities/= np.array(votes).shape[0]
-
-    rank_order = np.argmax(rank_probabilities, axis=0)
-
-    # Remove duplicates while maintaining order
-    _, unique_indices = np.unique(rank_order, return_index=True)
-    unique_rank_order = rank_order[np.sort(unique_indices)]
-
-    # Convert unique_rank_order to a list of indices
-    unique_rank_order = list(unique_rank_order)
-
-    #print('teams: ', teams)
-    #print('unique_rank_order: ', unique_rank_order)
-    #print('top_teams: ', [teams[i] for i in unique_rank_order])  # Use list comprehension to index
-
-    return np.array(unique_rank_order)
