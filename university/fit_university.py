@@ -6,36 +6,36 @@ import os
 import sys
 from numpy.random import default_rng
 
-from MLE.top_k import soft_top_k, soft_top_k_PL, soft_top_k_kendal
+from MLE.top_k import soft_top_k, soft_top_k_PL, soft_top_k_kendal, evaluate_in_sample_metrics
 from benchmark.fit_placket_luce import sample_PL, learn_PL
 from benchmark.fit_Mallow_kendal import learn_kendal
-from football.load_football import load_data, get_top_teams_borda, get_full_rankings
+from university.load_university import load_data, get_top_teams_borda, get_full_rankings
 """
 logging the error, best beta, best sigma for each alpha
 for each n_file and desired_teams there is a different json file
 
 """
 
-def fit_football(n_file, n_top_teams=11, n_bottom_teams=10, 
+def fit_uni(n_file, n_top_teams=11, n_bottom_teams=10, 
                                    Delta=7, seed=42):
     np.random.seed(seed)  # For reproducibility
 
     teams, votes_dict = load_data(limit=n_file)
 
     top_teams = get_top_teams_borda(teams, votes_dict)
-    # desired_teams = 1+np.concatenate([top_teams[1:n_top_teams], top_teams[-n_bottom_teams:-5]])
-    desired_teams = top_teams[::8] 
-    football_data = get_full_rankings(teams, votes_dict, which_team_to_keep = desired_teams[:10])
-    print(f'football_data: {football_data.shape}')
+    desired_teams = np.concatenate([top_teams[1:n_top_teams], top_teams[-n_bottom_teams:-5]])
+    data = get_full_rankings(teams, votes_dict, which_team_to_keep = desired_teams)
+
+    print(f'university_data: {data.shape}')
     
 
     num_trials = 10
-    train_size = 1000
+    train_size = int(data.shape[0]*.8)
     Delta = 7
-    results_file = f'football/results/football_fit_results_{n_file}_{n_top_teams}_{n_bottom_teams}.json'
+    results_file = f'university/results/fit_results_{n_file}_{n_top_teams}_{n_bottom_teams}.json'
     
     # Create directory if it doesn't exist
-    os.makedirs('football/results', exist_ok=True)
+    os.makedirs('university/results', exist_ok=True)
     
     # Check if results file exists and load existing results
     if os.path.exists(results_file):
@@ -53,7 +53,7 @@ def fit_football(n_file, n_top_teams=11, n_bottom_teams=10,
             
         print(f"Running trial {trial+1} of {num_trials}")
         
-        train_data, test_data, train_indices, test_indices = train_split(football_data, train_size, trial + seed)
+        train_data, test_data, train_indices, test_indices = train_split(data, train_size, trial + seed)
         
         # Fit consensus ranking
         sigma_0 = consensus_ranking_estimation(train_data)
@@ -70,13 +70,18 @@ def fit_football(n_file, n_top_teams=11, n_bottom_teams=10,
                                                        rng_seed=42)
         print(f"     [ML] Top-k hit rates calculated: {top_hit_rates}")
         pl_utilities, nll = learn_PL(train_data-1, test_data-1)
-        top_hit_rates_PL, distances_PL, ndcg_PL = soft_top_k_PL(test_data, pl_utilities)
+        top_hit_rates_PL, distances_PL, ndcg_PL, pairwise_acc_PL = soft_top_k_PL(test_data, pl_utilities)
         print(f"     [PL] Top-k hit rates calculated: {top_hit_rates_PL}")
 
         pi_0, theta_hat, _ = learn_kendal(train_data-1, test_data-1)
         print('       [kendal] pi_0', 1+pi_0)
-        top_hit_rates_kendal, distances_kendal, ndcg_kendal = soft_top_k_kendal(test_data, theta_hat, pi_0)
+        top_hit_rates_kendal, distances_kendal, ndcg_kendal,pairwise_acc_kendal = soft_top_k_kendal(test_data, theta_hat, pi_0)
         print(f"     [Kendal] top-k hit rates calculated: {top_hit_rates_kendal}")
+
+        train_metrics = evaluate_in_sample_metrics(train_data, alpha, beta, sigma_0)
+        print("train metrics")
+        print(train_metrics)
+
 
         
         # Store results for this trial
@@ -87,11 +92,14 @@ def fit_football(n_file, n_top_teams=11, n_bottom_teams=10,
             'top_hit_rates': top_hit_rates,
             'distances': distances,
             'ndcg': ndcg,
+            'pairwise':train_metrics["acc"],
             'top_hit_rates_PL': top_hit_rates_PL,
-            'distances_PL': distances_PL,
+            'distances_PL': distances_PL,            
+            'pairwise_PL': pairwise_acc_PL,
             'ndcg_PL': ndcg_PL,
             'top_hit_rates_kendal': top_hit_rates_kendal,
-            'distances_kendal': distances_kendal,
+            'pairwise_kendal': top_hit_rates_kendal,
+            'distances_kendal': pairwise_acc_kendal,
             'ndcg_kendal': ndcg_kendal,
             'test_indices': test_indices.tolist()
         }

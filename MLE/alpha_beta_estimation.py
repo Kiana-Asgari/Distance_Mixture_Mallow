@@ -63,8 +63,20 @@ def solve_alpha_beta_grid(pis, sigma,
     return np.array([α_hat, β_hat])
 
 import sys
+from scipy.optimize import root
+
+def find_root_from_approx(pis, sigma, initial_guess):
+    result = root(fun= psi_m_wrapper,  x0=initial_guess , args=(pis, sigma), method='hybr')
+    if result.success:
+        alpha_root, beta_root = result.x
+        print(f'Root found: alpha={alpha_root}, beta={beta_root}')
+        return result.x
+    else:
+        print(f'Root finding failed: {result.message}')
+        return initial_guess  # fallback to the best guess from differential evolution
+
 def solve_alpha_beta(pis, sigma, Delta,
-                     alpha_bounds=(1.0-1e-4, 2.0),
+                     alpha_bounds=(.1-1e-4, 3.0),
                      beta_bounds =(1e-4, 2.0),
                      *,
                      num_mc      = 300,   # high-precision MC only for the final polish
@@ -87,7 +99,7 @@ def solve_alpha_beta(pis, sigma, Delta,
     res = differential_evolution(
         psi_m_wrapper,
         bounds,
-        args=(pis, sigma, num_mc, Delta, 42),   # cheap MC here
+        args=(pis, sigma),  
         seed          = 42,
         #strategy      = "rand1bin",
         tol           = 5*1e-1,
@@ -97,8 +109,10 @@ def solve_alpha_beta(pis, sigma, Delta,
         #recombination = 0.9,
         #polish        = True,        # we'll replace polish with LS below
         #updating      = "deferred",
-        workers       = max_workers           
+        workers       = 1,
+        strategy='best1exp'
     )
 
     α_hat, β_hat = res.x  
+    # α_hat, β_hat = find_root_from_approx(pis, sigma, np.array([α_hat, β_hat]))
     return np.array([α_hat, β_hat])

@@ -4,7 +4,8 @@ from utils import get_support_and_tk
 from scipy.sparse import csr_matrix, identity
 
 
-
+def Z_wrap(n,alpha, beta, Delta=4):
+    return partition_estimation(beta, alpha, range(n), Delta)
 
 def partition_estimation(beta, alpha, sigma, Delta=4):
     """

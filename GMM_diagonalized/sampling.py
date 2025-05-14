@@ -102,7 +102,18 @@ def build_truncated_assignment_graph(n, k, A):
                             states_by_layer[row].append(new_state)
 
     return graph, DP, states_by_layer
+def dp_wrapper( n, alpha, beta, 
+                            Delta=6):
 
+    def truncated_A(i, j):
+        if j<1 or j>n:
+            return 0.0
+        dist = abs(i-j)
+        if dist>Delta:
+            return 0.0
+        return math.exp(-beta*(dist**alpha))
+    return dp_permanent(n, Delta, truncated_A)
+    
 def dp_permanent(n, k, A):
     """
     Use the DP approach (banded Toeplitz approach from the paper) to compute
