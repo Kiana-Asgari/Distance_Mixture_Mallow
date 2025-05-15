@@ -5,7 +5,6 @@ from scipy.interpolate import RectBivariateSpline
 
 # Load precomputed lookup tables
 def load_lookup_tables(n):
-    print("looking up saved data for n:",n)
     filename = f'GMM_diagonalized/mallows_lookup_tables_n{n}.pkl'
     with open(filename, 'rb') as f:
         return pickle.load(f)
@@ -55,7 +54,6 @@ def psi_m(pis: np.ndarray,
 
     # assemble Ψₘ
     hat_psi_m = np.array([-d_emp + d_mc, -d_dot_emp + d_dot_mc])
-    print(f'Computed for alpha: {alpha}, beta: {beta}, hat_psi_m: {hat_psi_m}')
     return hat_psi_m
 
     
