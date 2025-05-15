@@ -53,7 +53,6 @@ def generate_lookup_tables(n):
 
 # Example usage
 if __name__ == "__main__":
-    generate_lookup_tables(5)
+    #generate_lookup_tables(5)
     # generate_lookup_tables(10)
-    # generate_lookup_tables(15)
-    # generate_lookup_tables(20)
+    generate_lookup_tables(20)

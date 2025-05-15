@@ -5,6 +5,103 @@ from typing import Callable, Sequence, Tuple, List
 from benchmark.fit_placket_luce import sample_PL
 from scipy.stats import kendalltau
 from benchmark.fit_Mallow_kendal import sample_kendal
+
+
+
+
+import numpy as np
+
+
+import numpy as np
+
+
+def evaluate_metrics(test_set, sampled_set):
+    """
+    Metrics are the expectations  E [f(T, S)]  with T ⟂ S.  They are estimated
+    by averaging f over *all* pairs of independent draws (t_i , s_j) – i.e. the
+    Cartesian product between the two Monte-Carlo samples.  Everything is fully
+    vectorised; no explicit Python loops over samples.
+
+    Returns
+    -------
+    top_k_hit_rates : list[float]   –  Hit@k  (true top-1 item appears in model top-k)
+    spearman_rho    : float         –  ⟨Spearman ρ⟩
+    hamming_distance: float         –  ⟨normalised Hamming distance⟩
+    kendall_tau     : float         –  ⟨Kendall τ⟩
+    ndcg            : float         –  ⟨nDCG⟩  (rel = n−rank, log₂ discount)
+    pairwise_acc    : float         –  ⟨pair-wise concordance⟩
+    """
+    # ---------- array prep ----------
+    test_set = np.asarray(test_set)-1
+    sampled_set = np.asarray(sampled_set)-1
+    n_t, n_items  = test_set.shape
+    n_p, n_items_ = sampled_set.shape
+    if n_items != n_items_:
+        raise ValueError("Both sets must rank the same number of items.")
+
+    r = np.arange(n_items)
+
+    # inverse permutations:  item → rank
+    pos_t = np.empty_like(test_set)
+    pos_p = np.empty_like(sampled_set)
+    pos_t[np.arange(n_t)[:, None],  test_set]    = r
+    pos_p[np.arange(n_p)[:, None],  sampled_set] = r
+
+    # ---------- 1) top-k hit rates ----------
+    top1          = test_set[:, 0]                       # (n_t,)
+    ranks_top1    = pos_p[:, top1].T                     # (n_t , n_p)
+    top_k_hit_rates = [(ranks_top1 < k).mean()
+                       for k in range(1, n_items + 1)]
+
+    # ---------- 2) Spearman ρ ----------
+    d2_sum        = ((pos_t[:, None, :] - pos_p[None, :, :]) ** 2).sum(-1)
+    spearman_rho  = (1 - 6 * d2_sum / (n_items * (n_items**2 - 1))).mean()
+
+    # ---------- 3) Hamming distance ----------
+    hamming_distance = (test_set[:, None, :] != sampled_set[None, :, :]).mean()
+
+    # ---------- 4) Kendall τ  &  6) pair-wise accuracy ----------
+    iu, iv        = np.triu_indices(n_items, 1)
+    sign_t        = np.sign(pos_t[:, iu] - pos_t[:, iv])          # (n_t , P)
+    sign_p        = np.sign(pos_p[:, iu] - pos_p[:, iv])          # (n_p , P)
+    dot_mat       = sign_t @ sign_p.T                             # (n_t , n_p)
+    P             = iu.size                                       # number of pairs
+    kendall_tau   = (dot_mat / P).mean()
+    pairwise_acc  = ((dot_mat + P) / (2 * P)).mean()              # (= (τ+1)/2)
+
+    # ---------- 5) nDCG ----------
+    rel_t         = n_items - pos_t                               # relevance
+    disc_p        = 1 / np.log2(pos_p + 2)
+    dcg_mat       = rel_t @ disc_p.T                              # (n_t , n_p)
+    idcg          = (rel_t * (1 / np.log2(pos_t + 2))).sum(1)     # (n_t,)
+    ndcg          = (dcg_mat / idcg[:, None]).mean()
+
+    return (top_k_hit_rates,
+            float(spearman_rho),
+            float(hamming_distance),
+            float(kendall_tau),
+            float(ndcg),
+            float(pairwise_acc))
+
+
+
+
+
+
+
+
+
+
+
+
+########################################################
+# Old codes
+########################################################
+
+
+
+
+
 def soft_top_k_kendal(test_set, theta_hat, pi_0, num_mc=20_000):
     samples = 1 + np.array(sample_kendal(num_samples=num_mc, theta=theta_hat, sigma_0=pi_0))
     print('kendal samples:', samples[0])
@@ -64,7 +161,7 @@ def soft_top_k(test_set, alpha_hat, beta_hat, sigma_hat, Delta=None, rng_seed=No
         hit_rate_list.append(hit / len(test_set))
     distances = distance_metrics(test_set, samples)
     ndcg = ndcg_at_k(test_set, samples)
-    return hit_rate_list, distances, ndcg
+    return hit_rate_list, distances, ndcg, pairwise_accuracy(test_set, samples)
 
 def distance_metrics(test_set, MC_set, *, cayley_samples: int = 50_000, rng_seed: int | None = None):
     """

@@ -76,8 +76,8 @@ def find_root_from_approx(pis, sigma, initial_guess):
         return initial_guess  # fallback to the best guess from differential evolution
 
 def solve_alpha_beta(pis, sigma, Delta,
-                     alpha_bounds=(.1-1e-4, 3.0),
-                     beta_bounds =(1e-4, 2.0),
+                     alpha_bounds=(1e-4, 3.0),
+                     beta_bounds =(1e-4, 3.0),
                      *,
                      num_mc      = 300,   # high-precision MC only for the final polish
                      maxiter     = 10,      # few generations are enough
