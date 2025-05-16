@@ -9,26 +9,27 @@ from synthethic_tests.synthethic_script import save_synthetic_data
 from synthethic_tests.plot import plot_alpha_vs_n_samples, plot_beta_vs_n_samples
 from sushi_dataset.load_data import load_sushi
 from sushi_dataset.fit_sushi import fit_and_save_sushi
-from basketball.plot_bascketball import plot_model_comparisons_basketball
+from basketball.plot_bascketball import read_model_comparisons_basketball
 from football.plot_football import read_model_comparisons_football
-from sushi_dataset.plots import plot_model_comparisons_sushi
+from sushi_dataset.plot_sushi import read_model_comparisons_sushi
 from football.fit_football import fit_football
 from basketball.fit_bascketball import fit_basketball
 from university.fit_university import fit_uni
 from APA.fit_APA import fit_apa
 from plotting_utils import plot_marginal_heamap
 if __name__ == "__main__":
-    print('****************************Running main.py****************************')
-    #fit_football(Delta=8,n_teams_to_keep=10)
-    fit_and_save_sushi()
-    #read_model_comparisons_football()
+    print('****************************Running main.py***************************')
+    #plot_marginal_heamap(alpha=0.02, beta=0.74, Delta=8, n=10)
+    fit_football(Delta=7,n_teams_to_keep=10)
+    #fit_and_save_sushi()
+    #read_model_comparisons_sushi()
+    #read_model_comparisons_football(n_top_teams=10)
     #save_synthetic_data(n=10, alpha_0=1.5, beta_0=0.5, Delta=6)
     #plot_alpha_vs_n_samples(alpha_0=1.5, beta_0=0.5, n='15(main)')
    # plot_beta_vs_n_samples(alpha_0=1.5, beta_0=0.5, n='15(main)')
     #sushi_data = load_sushi()
    # print(sushi_data)
     #fit_and_save_sushi()
-    # fit_football(n_file=100,n_top_teams=11,n_bottom_teams=1)
     #fit_apa()
     # fit_uni(n_file=100,n_top_teams=11,n_bottom_teams=1)
     #fit_basketball(n_file=100,n_top_teams=21,n_bottom_teams=15,Delta=7,seed=42)

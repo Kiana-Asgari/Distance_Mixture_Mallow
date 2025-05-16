@@ -10,15 +10,14 @@ from MLE.top_k import evaluate_metrics
 from benchmark.fit_placket_luce import sample_PL, learn_PL
 from GMM_diagonalized.sampling import sample_truncated_mallow
 from benchmark.fit_Mallow_kendal import learn_kendal,sample_kendal
+from benchmark.fit_Mallow_spearman import learn_spearman, sample_spearman
 
-def fit_and_save_sushi(seed=42):
+def fit_and_save_sushi(seed=42, num_trials=25, training_ratio=0.8, Delta=7):
 
     sushi_data = load_sushi()    
-    num_trials = 10
-    train_size = 3500
-    Delta = 7
     results_file = 'sushi_dataset/results/sushi_fit_results.json'
-    
+    #train_size = int(len(sushi_data) * training_ratio)
+    train_size = 3500
     # Create directory if it doesn't exist
     os.makedirs('sushi_dataset/results', exist_ok=True)
     
@@ -59,8 +58,20 @@ def fit_and_save_sushi(seed=42):
         pi_0, theta_hat, _ = learn_kendal(train_data-1, test_data-1)
         sampled_set = sample_kendal(sigma_0=sigma_0, theta=theta_hat, num_samples=20_000)
         top_k_hit_rates_kendal, spearman_rho_kendal, hamming_distance_kendal, kendall_tau_kendal, ndcg_kendal, pairwise_acc_kendal = evaluate_metrics(test_data, sampled_set)
-
-        
+        ##########################################################
+        # Spearman model
+        ##########################################################
+        sigma_hat_spearman, beta_hat_spearman = learn_spearman(train_data-1)
+        sampled_set = sample_spearman(beta=beta_hat_spearman, sigma=sigma_hat_spearman, num_samples=20_000)
+        top_k_hit_rates_spearman, spearman_rho_spearman, hamming_distance_spearman, kendall_tau_spearman, ndcg_spearman, pairwise_acc_spearman = evaluate_metrics(test_data, sampled_set)
+        print(type(sigma_hat_spearman))
+        print(type(beta_hat_spearman))
+        print(type(top_k_hit_rates_spearman))
+        print(type(spearman_rho_spearman))
+        print(type(hamming_distance_spearman))
+        print(type(kendall_tau_spearman))
+        print(type(ndcg_spearman))
+        print(type(pairwise_acc_spearman))
         # Store results for this trial
         trial_results = {
             'alpha': alpha.tolist() if isinstance(alpha, np.ndarray) else alpha,
@@ -84,6 +95,14 @@ def fit_and_save_sushi(seed=42):
             'kendall_tau_kendal': kendall_tau_kendal,
             'ndcg_kendal': ndcg_kendal,
             'pairwise_acc_kendal': pairwise_acc_kendal,
+            'beta_hat_spearman': float(beta_hat_spearman),
+            'sigma_hat_spearman': sigma_hat_spearman.tolist() if isinstance(sigma_hat_spearman, np.ndarray) else sigma_hat_spearman,
+            'top_k_hit_rates_spearman': top_k_hit_rates_spearman.tolist() if isinstance(top_k_hit_rates_spearman, np.ndarray) else top_k_hit_rates_spearman,
+            'spearman_rho_spearman': float(spearman_rho_spearman),
+            'hamming_distance_spearman': float(hamming_distance_spearman),
+            'kendall_tau_spearman': kendall_tau_spearman,
+            'ndcg_spearman': ndcg_spearman,
+            'pairwise_acc_spearman': pairwise_acc_spearman,
             }
         
         print(f"     Trial {trial+1} results saved with data: {trial_results}")

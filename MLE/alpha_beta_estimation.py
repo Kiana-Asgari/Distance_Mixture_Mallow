@@ -27,8 +27,8 @@ from scipy.optimize import (
 #  GRID SEARCH – SciPy brute with multiprocessing
 # ==============================================================
 def solve_alpha_beta_grid(pis, sigma,
-                          alpha_bounds=(1., 3.),
-                          beta_bounds=(1e-3, 3.),
+                          alpha_bounds=(1, 3),
+                          beta_bounds=(1e-3, 3),
                           *,
                           num_mc   = 2000,    # Increased from 500
                           grid_N   = 64,      # Increased from 30
@@ -76,8 +76,8 @@ def find_root_from_approx(pis, sigma, initial_guess):
         return initial_guess  # fallback to the best guess from differential evolution
 
 def solve_alpha_beta(pis, sigma, Delta,
-                     alpha_bounds=(1e-4, 3.0),
-                     beta_bounds =(1e-4, 3.0),
+                     alpha_bounds=(1e-4, 3),
+                     beta_bounds =(1e-4, 3),
                      *,
                      num_mc      = 300,   # high-precision MC only for the final polish
                      maxiter     = 10,      # few generations are enough
