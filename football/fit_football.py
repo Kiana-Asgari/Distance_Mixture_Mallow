@@ -6,7 +6,7 @@ import os
 import sys
 from numpy.random import default_rng
 
-
+from benchmark.fit_Mallow_spearman import learn_spearman, sample_spearman
 from benchmark.fit_placket_luce import sample_PL, learn_PL
 from benchmark.fit_Mallow_kendal import learn_kendal, sample_kendal
 from football.load_football import load_data, get_top_teams_borda, get_full_rankings
@@ -19,10 +19,11 @@ for each n_file and desired_teams there is a different json file
 
 """
 
-def fit_football(training_ratio=0.8, Delta=7, seed=42, n_trials=10, n_teams_to_keep=10):
+def fit_football(training_ratio=0.8, Delta=7, seed=42, n_trials=50, n_teams_to_keep=10):
     full_data = load_football_data(n_teams_to_keep=n_teams_to_keep)
     train_size = int(len(full_data) * training_ratio)
-    results_file = f'football/results/football_2019_n_top_teams={n_teams_to_keep}.json'
+    results_file = f'football/results/football_2019_n_top_teams={n_teams_to_keep}(chronological).json'
+
     
     # Create directory if it doesn't exist
     os.makedirs('football/results', exist_ok=True)
@@ -58,8 +59,20 @@ def fit_football(training_ratio=0.8, Delta=7, seed=42, n_trials=10, n_teams_to_k
         pi_0, theta_hat, _ = learn_kendal(train_data-1, test_data-1)
         sampled_set = sample_kendal(sigma_0=sigma_0, theta=theta_hat, num_samples=20_000)
         top_k_hit_rates_kendal, spearman_rho_kendal, hamming_distance_kendal, kendall_tau_kendal, ndcg_kendal, pairwise_acc_kendal = evaluate_metrics(test_data, sampled_set)
-
-        
+        ##########################################################
+        # Spearman model
+        ##########################################################
+        sigma_hat_spearman, beta_hat_spearman = learn_spearman(train_data-1)
+        sampled_set = sample_spearman(beta=beta_hat_spearman, sigma=sigma_hat_spearman, num_samples=20_000)
+        top_k_hit_rates_spearman, spearman_rho_spearman, hamming_distance_spearman, kendall_tau_spearman, ndcg_spearman, pairwise_acc_spearman = evaluate_metrics(test_data, sampled_set)
+        print(type(sigma_hat_spearman))
+        print(type(beta_hat_spearman))
+        print(type(top_k_hit_rates_spearman))
+        print(type(spearman_rho_spearman))
+        print(type(hamming_distance_spearman))
+        print(type(kendall_tau_spearman))
+        print(type(ndcg_spearman))
+        print(type(pairwise_acc_spearman))
         # Store results for this trial
         trial_results = {
             'alpha': alpha.tolist() if isinstance(alpha, np.ndarray) else alpha,
@@ -82,7 +95,7 @@ def fit_football(training_ratio=0.8, Delta=7, seed=42, n_trials=10, n_teams_to_k
             'hamming_distance_kendal': hamming_distance_kendal,
             'kendall_tau_kendal': kendall_tau_kendal,
             'ndcg_kendal': ndcg_kendal,
-            'pairwise_acc_kendal': pairwise_acc_kendal,
+            'pairwise_acc_kendal': pairwise_acc_kendal
             }
         
         print(f"     Trial {trial+1} results saved with data: {trial_results}")
@@ -134,6 +147,8 @@ def _fit_football(n_file, n_top_teams=11, n_bottom_teams=10,
     desired_teams = top_teams[::8] 
     football_data = get_full_rankings(teams, votes_dict, which_team_to_keep = desired_teams[:10])
     print(f'football_data: {football_data.shape}')
+    print(f"Loaded {len(results)} existing trials")
+    sys.exit()
     
 
     num_trials = 10
@@ -213,20 +228,50 @@ def _fit_football(n_file, n_top_teams=11, n_bottom_teams=10,
     print(f"Completed {len(results)} trials. Results saved to '{results_file}'")
 
 
-def train_split(sushi_data, train_size, seed):
+def train_split(sport_data, training_ratio, seed=None):
+    """
+    Split data chronologically, with training data from earlier time periods
+    and test data randomly sampled from the later time period.
+    
+    Parameters:
+    -----------
+    sport_data : array-like
+        The sports data ordered chronologically by date
+    train_size : int
+        Number of samples to include in the training set
+    seed : int, optional
+        Random seed for reproducibility
+        
+    Returns:
+    --------
+    train_data, test_data, train_indices, test_indices
+    """
     # Initialize random number generator with seed
     rng = default_rng(seed)
-    all_indices = np.arange(len(sushi_data))
-    rng.shuffle(all_indices)
-    train_indices = all_indices[:train_size]
-    test_indices = all_indices[train_size:]
     
-    # Convert sushi_data to numpy array if it's not already
-    sushi_data_array = np.asarray(sushi_data)
+    # Convert sport_data to numpy array if it's not already
+    sport_data_array = np.asarray(sport_data)
+    n_samples = len(sport_data_array)
+    
+    # Use 80% of data for potential training, 20% for potential testing
+    train_test_split = int(n_samples * 0.7)
+    
+    # All indices before the split point are potential training data
+    train_pool_indices = np.arange(train_test_split)
+    
+    # All indices after the split point are potential test data
+    test_pool_indices = np.arange(train_test_split, n_samples)
+    
+    # Randomly sample train_size indices from the training pool
+    train_size = 800#int(training_ratio * len(train_pool_indices))
+    test_size = 250#int(training_ratio * len(test_pool_indices))
+    
+    train_indices = rng.choice(train_pool_indices, size=train_size, replace=False)
+    test_indices = rng.choice(test_pool_indices, size=test_size, replace=False)
     
     # Split data into training and testing sets
-    train_data = np.array([sushi_data_array[i] for i in train_indices])
-    test_data = np.array([sushi_data_array[i] for i in test_indices])
+    train_data = sport_data_array[train_indices]
+    test_data = sport_data_array[test_indices]
     
     return train_data, test_data, train_indices, test_indices
 

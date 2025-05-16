@@ -1,41 +1,47 @@
 import kagglehub
 import os
 import pandas as pd
+import sys
 
 
 
-def load_football_data(n_teams_to_keep=10):
+def load_basketball_data(n_teams_to_keep=10):
     teams_to_keep = [
-                    ' Georgia             ',
-                    ' Alabama             ',
-                    ' Michigan            ',
-                    ' Cincinnati          ',
+                    ' Gonzaga             ',
+                    ' Illinois            ',
                     ' Baylor              ',
+                    ' Michigan            ',
+                    ' Alabama             ',
+                    ' Houston             ',
                     ' Ohio St             ',
+                    ' Iowa                ',
+                    ' Texas               ',
+                    ' Arkansas            ',
                     ' Oklahoma St         ',
-                    ' Notre Dame          ',
-                    ' Michigan St         ',
-                    ' Oklahoma            ',
-                    ' Mississippi         ',
-                    ' Utah                ',
-                    ' Pittsburgh          ',
-                    ' Clemson             ',
-                    ' Wake Forest         '
-                ][:n_teams_to_keep]
-    all_team_names, rankings_by_name = fetch_recent_football_data()
+                    ' Kansas              ',
+                    ' West Virginia       ',
+                    ' Florida St          ',
+                    ' Virginia            '
+                    ]
+
+    all_team_names, rankings_by_name = fetch_recent_basketball_data()
+    if n_teams_to_keep > len(teams_to_keep):
+        teams_to_keep = all_team_names[:n_teams_to_keep]
+    else:
+        teams_to_keep = teams_to_keep[:n_teams_to_keep]
+
     selected_rankings = choose_top_teams(rankings_by_name, teams_to_keep)
     selected_rankings_by_id = rankings_by_id(selected_rankings, teams_to_keep)
     print(f"Selected rankings: {len(selected_rankings)}, each of length {len(selected_rankings[0])}")
-    print(f"the first ranking id is: {selected_rankings_by_id[0]}")
-    print(f"the first ranking name is: {selected_rankings[0]}")
+
     return selected_rankings_by_id
 
-def fetch_recent_football_data():
+def fetch_recent_basketball_data():
     # Download latest version
     path = kagglehub.dataset_download("masseyratings/rankings")
     
     # Read and print heads of specific files
-    target_files = [ "cf2021.csv", "cf2020.csv","cf2019.csv"]
+    target_files = ["cb2021.csv", "cb2020.csv"]
     rankings_by_name = []
     all_team_names = []
 
@@ -43,17 +49,18 @@ def fetch_recent_football_data():
         file_path = os.path.join(path, target_file)
         if os.path.exists(file_path):
             df = pd.read_csv(file_path)
-            current_rankings, current_team_names = process_recent_football_data(df)
+            current_rankings, current_team_names = process_recent_basketball_data(df)
             rankings_by_name.extend(current_rankings)
             all_team_names.extend(current_team_names)
         else:
             print(f"\nFile not found: {target_file}")
     print(f"number of full rankings: {len(rankings_by_name)}")
-
+    print(f"number of all team names: {len(all_team_names)}")
+ 
 
     return all_team_names, rankings_by_name
 
-def process_recent_football_data(df):
+def process_recent_basketball_data(df):
     rankings_by_name = []
     all_team_names = []
     current_ranking = []
