@@ -3,8 +3,8 @@ This repository contains the code for the paper **Mallows Model with Learned Dis
 
 In this work, we present a new statistical model for learning the underlying ranking (preference) from observed empirical rankings and comparing it to other models. We also prove theoretical guarantees for convergence and the efficiency of our learning method. 
 
-Models in this repository include:
-- $L_\alpha$ Mallows (Distance Mixture model):
+Ranking models implemented in this repository include:
+- $L_\alpha$ Mallows (Distance Mixture model--ours):
 >  $$P_{\alpha,\beta}(\pi) = \frac{1}{Z_{\alpha,\beta}} \exp\{ -\beta d_\alpha(\pi, \sigma_0) \} $$,
 >  where $d_\alpha(\pi, \sigma_0) = \sum_{i=1}^n |\pi(i) - \sigma_0(i)|^\alpha $
 
