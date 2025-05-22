@@ -24,10 +24,12 @@ pip install -r requirements.txt
 If you face issues with conda, you can alternatively use Python's built-in venv:
 
 ```bash
+# on windows:
 python -m venv myenv
-# On Windows:
 myenv\Scripts\activate
-# On macOS/Linux:
+
+# on mac/linux
+python -m venv myenv
 source myenv/bin/activate
 pip install -r requirements.txt
 ```
@@ -38,9 +40,15 @@ To access college sport datasets, you need to have your Kaggle API credentials s
 
 ## 3. Example Usage
 
-### Real-World Dataset: sushi
+
+
+### Real-World Dataset: basketball
 ```bash
-python script.py fit-real-world --dataset sushi --n-trials 3 --verbose
+python script.py fit-real-world --dataset basketball --n-teams 100 --n-trials 3 --verbose
+```
+
+```bash
+python script.py fit-real-world --dataset basketball --n-teams 10 --n-trials 3 --verbose
 ```
 
 ### Real-World Dataset: football
@@ -48,15 +56,17 @@ python script.py fit-real-world --dataset sushi --n-trials 3 --verbose
 python script.py fit-real-world --dataset football --n-trials 3 --verbose
 ```
 
-### Real-World Dataset: basketball
+### Real-World Dataset: sushi
 ```bash
-python script.py fit-real-world --dataset basketball --n-trials 3 --verbose
+python script.py fit-real-world --dataset sushi --n-trials 3 --verbose
 ```
+
+
 
 ### Synthetic Data:
 
 ```bash
-python script.py fit-synthetic  --alpha-0 1.5 --beta-0 0.5 --n_train 10 50 200 --truncation_training 6 --n-trials 4 --verbose
+python script.py fit-synthetic  --alpha-0 1.5 --beta-0 0.5 --n_train 50 --truncation_training 6 --n-trials 4 --verbose
 ```
 
 ## 4. Available Arguments

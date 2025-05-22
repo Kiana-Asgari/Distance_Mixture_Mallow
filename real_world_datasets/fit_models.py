@@ -81,7 +81,7 @@ def fit_models(
 
     say(f"\nCompleted {len(results)} trials")
     say(f"   L-α Mallows chose the following central ranking: {results[0]['sigma_0']}")
-    say(f"   Kendal chose the following central ranking: {results[0]['sigma_0_kendal']}")
+    say(f"   Kendal chose the following central ranking: {1+results[0]['sigma_0_kendal']}")
     print_online_results(results)
     if save:
         say(f"Final results → {res_path}")
