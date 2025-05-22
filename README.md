@@ -4,11 +4,13 @@ This repository contains the code for the paper *Mallows Model with Learned Dist
 In this work, we present a new statistical model for learning the underlying ranking (prefrence) from observed empirical rankings and comparing it to the other models. We also prove theoretical guarantees for convergence and the efficiency of our learning method. 
 
 Models in this repository include:
--• $L_\alpha$ Mallows (Distance Mixture model):
+>>• $L_\alpha$ Mallows (Distance Mixture model):
   $$P_{\alpha,\beta}(\pi) = \frac{1}{Z_{\alpha,\beta}} \exp\{ -\beta d_\alpha(\pi, \sigma_0) \} $$,
   where $d_\alpha(\pi, \sigma_0) = \sum_{i=1}^n |\pi(i) - \sigma_0(i)|^\alpha $
--• Mallows's model with Kendall $\tau$ distance
--• Plackett-Luce model
+>>
+>>• Mallows's model with Kendall $\tau$ distance
+>>
+>>• Plackett-Luce model
 
 Our simulations show significant improvements achieved by learning the distance metric in the $L_\alpha$ Mallows model over famous models such as Plackett-Luce and Mallows's model with Kendall $\tau$ distance. The table below shows results for the college basketball dataset:
 
