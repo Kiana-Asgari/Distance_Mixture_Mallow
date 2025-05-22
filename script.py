@@ -3,6 +3,7 @@ import argparse
 from real_world_datasets.fit_models import fit_models
 from real_world_datasets.print_evaluations import read_and_print_results
 from synthethic_tests.synthethic_script import learn_synthetic_data
+from synthethic_tests.synthethic_script import test_effect_of_truncation,test_effect_of_n
 
 def parse_arguments():
     parser = argparse.ArgumentParser(
@@ -55,7 +56,8 @@ def parse_arguments():
 
 if __name__ == "__main__":
     args = parse_arguments()
-
+    #test_effect_of_truncation()
+    test_effect_of_n()
     if args.mode == 'fit-synthetic':
         learn_synthetic_data(n=args.n_items,
                              Delta=args.truncation,

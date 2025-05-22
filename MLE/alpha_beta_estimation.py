@@ -14,7 +14,8 @@ def solve_alpha_beta(pis, sigma, Delta,
                      mutation    = (0.1, 0.5), # Wider range for better exploration
                      recombination = 0.9,
                      tol         = 1e-2,      # Decreased from 5*1e-1 for higher accuracy
-                     rng_seed    = None,):  # Added finish_method parameter
+                     rng_seed    = None,
+                     ord         = 1/2):  # Added finish_method parameter
 
     """
     Zeroth-order search for (α̂, β̂) such that Ψ_m(α̂,β̂;σ)=0.
@@ -26,7 +27,7 @@ def solve_alpha_beta(pis, sigma, Delta,
     res = differential_evolution(
         psi_m_wrapper,
         bounds,
-        args=(pis, sigma, Delta),
+        args=(pis, sigma, Delta, ord),
         seed          = 42,
         strategy      = 'best1bin',
         tol           = tol,  # Even tighter tolerance
