@@ -19,10 +19,6 @@ def learn_PL(permutations_train, permutations_test):
 #  Plackett–Luce model class
 # ----------------------------------------------------------------------
 class PlackettLuceModel:
-    """
-    Maximum-likelihood learning for the Plackett–Luce model, written entirely
-    with vectorised NumPy (no Python loops in the likelihood any more).
-    """
 
     def __init__(self, rankings: np.ndarray):
         """
@@ -35,9 +31,7 @@ class PlackettLuceModel:
         self.rankings = rankings
         self.n_items  = rankings.shape[1]
 
-    # -----------------------------
-    #  Vectorised negative log-likelihood
-    # -----------------------------
+
     def negative_log_likelihood(self, params: np.ndarray) -> float:
         """
         Vectorised implementation of
@@ -68,17 +62,11 @@ class PlackettLuceModel:
         if initial_guess is None:
             initial_guess = np.zeros(self.n_items)
 
-        # Simple progress print-out
-        step = {'i': 0}
-        def cb(xk):
-            step['i'] += 1
-            print(f"Iter {step['i']:3d}  NLL = {self.negative_log_likelihood(xk):.4f}")
 
         res = minimize(
             self.negative_log_likelihood,
             initial_guess,
             method='L-BFGS-B',
-            callback=cb,
             options={'maxiter': 1000, 'disp': False}
         )
         return res.x

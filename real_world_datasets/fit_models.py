@@ -5,9 +5,11 @@ import numpy as np
 
 # ── data & utils ────────────────────────────────────────────────────────────────
 from real_world_datasets.college_sports.load_data import load_data
-from real_world_datasets.utils import chronologically_train_split
+from real_world_datasets.sushi_dataset.load_data import load_sushi
+from real_world_datasets.utils import train_split, convert_numpy_to_native
+from real_world_datasets.utils import chronologically_train_split, convert_numpy_to_native
 from real_world_datasets.print_evaluations import print_online_results
-
+    
 # ── Mallows (L-α) ──────────────────────────────────────────────────────────────
 from MLE.consensus_ranking_estimation import consensus_ranking_estimation
 from MLE.alpha_beta_estimation import solve_alpha_beta
@@ -39,8 +41,11 @@ def fit_models(
     ):
 
     say = print if verbose else (lambda *_, **__: None) # print if verbose else do nothing
-
-    data = load_data(dataset_name=dataset_name, n_teams_to_keep=n_teams)
+    if dataset_name == 'sushi':
+        data = load_sushi()
+    else:
+        data = load_data(dataset_name=dataset_name, n_teams_to_keep=n_teams)
+        
     res_path = Path(f"real_world_datasets/results/{dataset_name}_n_teams={n_teams}.json")
     res_path.parent.mkdir(parents=True, exist_ok=True) # create the directory if it doesn't exist
     if save==True:
@@ -71,21 +76,24 @@ def fit_models(
 
         results.append(trial)
         if save:
-            res_path.write_text(json.dumps(results, indent=2))
+            res_path.write_text(json.dumps(convert_numpy_to_native(results), indent=2))
             say("  ⭑ intermediate results saved")
 
     say(f"\nCompleted {len(results)} trials")
-    say(f"  [1/3] L-α Mallows chose the following central ranking: {results[0]['sigma_0']}")
-    say(f"  [2/3] Plackett-Luce is learned with utilities: {results[0]['utilities_PL']}")
-    say(f"  [3/3] Kendall is learned with theta: {results[0]['theta_kendal']}")
+    say(f"   L-α Mallows chose the following central ranking: {results[0]['sigma_0']}")
+    say(f"   Kendal chose the following central ranking: {results[0]['sigma_0_kendal']}")
     print_online_results(results)
     if save:
         say(f"Final results → {res_path}")
 
-import sys
+
+
 
 def fit_mallows(train, test, k, mc, delta, say):
-    say(f"  [1/3] Starting to learn L-α Mallows model.")
+    if len(train[0]) > 20:
+        say(f"  [1/3] Starting to learn L-α Mallows model. This may take a while for {len(train[0])} items ...")
+    else:
+        say(f"  [1/3] Starting to learn L-α Mallows model.")
     sigma_0 = consensus_ranking_estimation(train)
     alpha, beta = solve_alpha_beta(train, sigma_0, Delta=delta)
     say(f"        L-α Mallows is learned with alpha: {alpha:.4f}, beta: {beta:.4f}")
@@ -123,12 +131,12 @@ def fit_kendall(train, test, mc, say):
     else:
         say(f"  [3/3] Starting to learn Kendall model.")
     sigma_0, theta, _ = learn_kendal(train - 1, test - 1)
-    say(f"        Kendall is learned with theta: {theta}.")
+    say(f"        Kendall is learned with theta: {theta:.4f}.")
     say(f"        testing the Kendall model with {mc} samples...")
     # testing the model ...
     samples = sample_kendal(sigma_0=sigma_0, theta=theta, num_samples=mc)
     evals = evaluate_metrics(test, samples)
-    full_trial_results = {**pack(*evals, suffix="_kendal"), "sigma_0": sigma_0, "theta": theta}
+    full_trial_results = {**pack(*evals, suffix="_kendal"), "sigma_0_kendal": sigma_0, "theta_kendal": theta}
     say(f"             top-1 hit rate: {full_trial_results['top_k_hit_rates_kendal'][0]:.4f}")
     return full_trial_results
 
