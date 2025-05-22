@@ -3,6 +3,25 @@ from numpy.random import default_rng
 from tabulate import tabulate
 from real_world_datasets.config import MODEL_LABEL, MODEL_NICE_NAME, METRICS_NICE_NAMES
 
+
+
+def train_split(sushi_data, train_size, seed):
+    # Randomly select indices for training using the RNG
+    # Initialize random number generator with seed
+    rng = default_rng(seed)
+    all_indices = np.arange(len(sushi_data))
+    rng.shuffle(all_indices)
+    train_indices = all_indices[:train_size]
+    test_indices = all_indices[train_size:]
+    
+    # Split data into training and testing sets
+    train_data = sushi_data[train_indices]
+    test_data = sushi_data[test_indices]
+    return train_data, test_data, train_indices, test_indices
+
+
+
+
 def chronologically_train_split(sport_data, seed=None):
     # Initialize random number generator with seed
     rng = default_rng(seed)
@@ -34,6 +53,22 @@ def chronologically_train_split(sport_data, seed=None):
     return train_data, test_data, train_indices, test_indices
 
 
+def convert_numpy_to_native(obj):
+    """Convert numpy arrays to native Python types for JSON serialization."""
+    if isinstance(obj, np.ndarray):
+        return obj.tolist()
+    elif isinstance(obj, np.integer):
+        return int(obj)
+    elif isinstance(obj, np.floating):
+        return float(obj)
+    elif isinstance(obj, dict):
+        return {k: convert_numpy_to_native(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [convert_numpy_to_native(item) for item in obj]
+    return obj
+
+
+
 
 ####################################
 # Table builder
@@ -59,9 +94,7 @@ def make_table(trials):
                 for m in MODEL_LABEL])
 
     print(tabulate(rows, headers=['Metric'] + list(MODEL_NICE_NAME.values()),
-                tablefmt='latex'))
-
-
+                tablefmt='fancy_grid'))
 
 def _col(values, scale=1):
     """mean ± std, optionally scaled (e.g. to %)"""

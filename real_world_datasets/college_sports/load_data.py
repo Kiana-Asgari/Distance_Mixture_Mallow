@@ -6,22 +6,26 @@ import sys
 from tqdm import tqdm
 from pathlib import Path
 from real_world_datasets.config import TOP_TEAMS, FILES
+from collections import Counter
 
-def load_data(n_teams_to_keep=10, dataset_name="basketball"):
+def load_data(n_teams_to_keep, dataset_name):
+    print('loading data', dataset_name)
     top_10 = top_10_teams(dataset_name)
     all_team_names, rankings_by_name = fetch_data(dataset_name)
 
-    if n_teams_to_keep > len(top_10):
-        teams_to_keep = all_team_names[:n_teams_to_keep]
-    elif dataset_name == "basketball":
+
+    if n_teams_to_keep <= len(top_10):
         teams_to_keep = top_10[:n_teams_to_keep]
-    elif dataset_name == "football":
-        teams_to_keep = top_10[-n_teams_to_keep:]
+    elif dataset_name == 'football':
+        print(f'choosing {n_teams_to_keep} most common teams for {dataset_name}')
+        teams_to_keep = chose_most_common_teams(rankings_by_name, n_teams_to_keep)
+    elif dataset_name == 'basketball':
+        teams_to_keep = all_team_names[:n_teams_to_keep]
+    else:
+        raise ValueError(f"Unknown dataset {dataset_name!r} (choose from {list(FILES)})")
    
     selected_rankings = choose_top_teams(rankings_by_name, teams_to_keep)
     selected_rankings_by_id = rankings_by_id(selected_rankings, teams_to_keep)
-
-    print(f"Selected rankings: {len(selected_rankings)}, each of length {len(selected_rankings[0])}")
 
     return selected_rankings_by_id
 
@@ -49,7 +53,7 @@ def fetch_data(ds):
 
 
 # ------------------------------------------------------------------
-# 1) split the CSV into “weekly” rankings + collect unique teams
+# 1) split the CSV into "weekly" rankings + collect unique teams
 # ------------------------------------------------------------------
 def process_data(df, *, rank_col=-1, team_col=2, min_size=10):
     names = df.iloc[:, team_col].to_numpy()
@@ -100,3 +104,16 @@ def top_10_teams(dataset_name):
     if dataset_name in TOP_TEAMS:
         return TOP_TEAMS[dataset_name]
     return []
+
+def chose_most_common_teams(rankings_by_name, n_teams_to_keep):
+    """
+    Choose n_teams_to_keep based on the most commonly participating teams in the rankings.
+    """
+    # Flatten the list of rankings into a single list of team names
+    all_teams = [team for ranking in rankings_by_name for team in ranking]
+    
+    # Count occurrences of each team
+    team_counts = Counter(all_teams)
+    selected_teams = [team for team, count in team_counts.most_common(n_teams_to_keep)]
+    print('football chosen teams:', selected_teams)
+    return selected_teams
