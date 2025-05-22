@@ -75,4 +75,4 @@ def generate_lookup_tables(n, Delta):
 if __name__ == "__main__":
     #generate_lookup_tables(5)
     # generate_lookup_tables(10)
-    generate_lookup_tables(n=100, Delta=7)
+    generate_lookup_tables(n=20, Delta=6)

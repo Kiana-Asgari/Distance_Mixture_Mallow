@@ -1,184 +1,155 @@
-import json, os, sys
+# -*- coding: utf-8 -*-
+"""
+Synthetic-data study:
+    • sample from a truncated Mallow model
+    • estimate consensus + (α,β)
+    • log results in JSON   (one file per parameter grid)
+
+All multiprocessing output is funnelled back to the main process so that
+log lines appear in the natural sequence:
+      n_samples = n₁
+        trial 0 ...
+        trial 1 ...
+      n_samples = n₂
+        …
+"""
+
+import json, os
 from datetime import datetime
 from functools   import partial
 from concurrent.futures import ProcessPoolExecutor, as_completed
+
 import numpy as np
 
-
-from GMM_diagonalized.sampling import sample_truncated_mallow
-from MLE.consensus_ranking_estimation import consensus_ranking_estimation
-from MLE.alpha_beta_estimation import solve_alpha_beta
+from GMM_diagonalized.sampling             import sample_truncated_mallow
+from MLE.consensus_ranking_estimation      import consensus_ranking_estimation
+from MLE.alpha_beta_estimation             import solve_alpha_beta
 
 
 # ---------------------------------------------------------------------
-# Worker function (MUST be top-level for multiprocessing)
+# Single worker (runs in its own process – keep **quiet**!)
 # ---------------------------------------------------------------------
-def _single_trial(num_samples, trial, *, n, Delta, sigma_0, beta_0, alpha_0):
-    """Run one (num_samples, trial) experiment and return a dict."""
-    print(f'running trial {trial} of {num_samples} samples...')
+def _single_trial(num_samples, trial,
+                  *, n, Delta, sigma_0, beta_0, alpha_0):
+    """
+    Run exactly one experiment.  All messages are returned to the parent
+    so that printing order is controlled centrally.
+    """
     try:
-        # Sampling
-        train_samples = sample_truncated_mallow(num_samples=num_samples,
-                                                n=n, beta=beta_0, alpha=alpha_0,
-                                                sigma=sigma_0, Delta=Delta,
-                                                rng_seed=trial)
+        # ---------- sampling ----------
+        train = sample_truncated_mallow(num_samples=num_samples,
+                                        n=n, beta=beta_0, alpha=alpha_0,
+                                        sigma=sigma_0, Delta=Delta,
+                                        rng_seed=trial)
 
-        # Estimation
-        consensus = consensus_ranking_estimation(train_samples)
-        alpha_hat, beta_hat = solve_alpha_beta(train_samples, consensus, Delta=Delta)
+        # ---------- estimation ----------
+        consensus        = consensus_ranking_estimation(train)
+        alpha_hat, beta_hat = solve_alpha_beta(train, consensus, Delta=Delta)
 
-        return {
-            "num_samples": num_samples,
-            "trial_number": trial,
-            "alpha": float(alpha_hat),
-            "beta": float(beta_hat),
-            "consensus_ranking": consensus.tolist()
-        }
-    except Exception as e:
-        print(f"Error in trial {trial} with {num_samples} samples: {e}")
-        return None
+        return dict(num_samples   = int(num_samples),
+                    trial_number  = int(trial),
+                    alpha         = float(alpha_hat),
+                    beta          = float(beta_hat),
+                    consensus_ranking = consensus.tolist())
+
+    except Exception as err:          # propagate the error details
+        return dict(num_samples  = int(num_samples),
+                    trial_number = int(trial),
+                    error        = str(err))
+
 
 # ---------------------------------------------------------------------
 # Main driver
 # ---------------------------------------------------------------------
-def save_synthetic_data(filename=None,
-                        *,
-                        n=15,
-                        Delta=6,
-                        sigma_0=None,
-                        beta_0=0.5,
-                        alpha_0=1.5,
-                        num_train_samples=np.arange(15, 350, 5),
-                        n_trials=50,
-                        max_workers=16):
-    """Runs all experiments in parallel and logs results to a JSON file."""
-    print('****************  synthetic script running  ****************')
+def learn_synthetic_data(*,
+        filename         = None,
+        n                = 15,
+        Delta            = 6,
+        sigma_0          = None,
+        beta_0           = 0.5,
+        alpha_0          = 1.5,
+        num_train_samples= np.arange(15, 350, 5),
+        n_trials         = 50,
+        max_workers      = 4,
+        save             = True, 
+        verbose          = True):
+    if verbose:
+        print(f"\n ============================ Running synthetic test with n={n}, truncation={Delta}, alpha_0={alpha_0}, beta_0={beta_0} ============================  ")
 
-    # --- Set default sigma_0 if not provided ---------------------------
+    # ------- default σ₀ -------
     if sigma_0 is None:
         sigma_0 = 1 + np.arange(n)
 
-    # --- Create or find a suitable file name ---------------------------
+    # ------- output file -------
     log_dir = "synthethic_tests/log"
     os.makedirs(log_dir, exist_ok=True)
 
-    if filename is None:
-        base = f"estimation_{alpha_0}_{beta_0}_{n}"
-        filename = os.path.join(log_dir, f"{base}.json")
-        # No longer increment k for new filenames - use existing file if it exists
+    if save and filename is None:
+        filename = os.path.join(
+            log_dir,
+            f"estimation_n{n}_Δ{Delta}_α{alpha_0}_β{beta_0}.json"
+        )
 
-    # --- Initialize or load existing JSON structure -------------------
-    if os.path.exists(filename):
-        # Load existing results file
-        with open(filename, "r") as f:
+    # ------- (re-)initialise results -------
+    if save and os.path.exists(filename):
+        with open(filename) as f:
             results = json.load(f)
-        print(f"Loaded existing results from {filename}")
-        
-        # Update parameters if needed
-        results["parameters"].update({
-            "n": n,
-            "Delta": Delta,
-            "sigma_0": sigma_0.tolist(),
-            "beta_0": beta_0,
-            "alpha_0": alpha_0,
-            "n_trials": n_trials,
-            "last_updated": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        })
+        results["parameters"]["last_updated"] = datetime.now().isoformat()
+        print(f"[INFO]  Appending to existing log → {filename}")
     else:
-        # Create new results structure
-        results = {
-            "parameters": {
-                "n": n,
-                "Delta": Delta,
-                "sigma_0": sigma_0.tolist(),
-                "beta_0": beta_0,
-                "alpha_0": alpha_0,
-                "n_trials": n_trials,
-                "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            },
-            "trials": {}
-        }
-        print(f"Created new results structure for {filename}")
-
-    # Write initial structure to file
-    with open(filename, "w") as f:
-        json.dump(results, f, indent=2)
+        results = dict(parameters = dict(
+                            n         = n,
+                            Delta     = Delta,
+                            sigma_0   = sigma_0.tolist(),
+                            beta_0    = beta_0,
+                            alpha_0   = alpha_0,
+                            n_trials  = n_trials,
+                            timestamp = datetime.now().isoformat()),
+                       trials = {})
+        if save:
+            with open(filename, "w") as f: json.dump(results, f, indent=2)
 
     # -----------------------------------------------------------------
-    # Submit every (num_samples, trial) to the process pool
+    # Multiprocessing pool (up to 4 workers)
     # -----------------------------------------------------------------
+    max_workers = max(1, min(int(max_workers), 4))
     worker = partial(_single_trial,
                      n=n, Delta=Delta, sigma_0=sigma_0,
                      beta_0=beta_0, alpha_0=alpha_0)
 
-    tasks = [(ns, tr) for ns in num_train_samples for tr in range(n_trials)]
-    n_tasks = len(tasks)
+    with ProcessPoolExecutor(max_workers=max_workers) as pool:
 
-    # --- Ensure max_workers never exceeds 4 ---------------------------
-    print(f"Using {max_workers} workers to avoid overload.")
+        # ----- loop over each training-set size in sequence -----
+        for ns in num_train_samples:
+            print(f"\n===== Training size: {ns} ( {n_trials} trials ) =====")
 
+            # launch all trials in parallel
+            futs = [ pool.submit(worker, ns, tr) for tr in range(n_trials) ]
 
-    try:
-        with ProcessPoolExecutor(max_workers=max_workers) as pool:
-            futures = {pool.submit(worker, ns, tr): (ns, tr) for ns, tr in tasks}
+            # collect as they finish
+            bucket = [None] * n_trials
+            for done_cnt, fut in enumerate(as_completed(futs), 1):
+                res = fut.result()
 
-            for idx, fut in enumerate(as_completed(futures), 1):
-                try:
-                    trial_data = fut.result()
-                    if trial_data is None:
-                        print(f"[{idx}/{n_tasks}]  Error encountered, skipping.")
-                        continue
-                    
-                    ns = str(trial_data.pop("num_samples"))
+                if "error" in res:
+                    print(f"  !! trial {res['trial_number']} failed: {res['error']}")
+                    continue
 
-                    # Append & write results safely under the main process
-                    results["trials"].setdefault(ns, []).append(trial_data)
-                    with open(filename, "w") as f:
-                        json.dump(results, f, indent=2)
+                t = res["trial_number"]
+                bucket[t] = res
+                print(f"  [ trial {done_cnt:2d}/{n_trials} ]  "
+                      f"  α̂ = {res['alpha']:.3f}  β̂ = {res['beta']:.3f}")
 
-                    done = futures[fut]
-                    print(f"[{idx}/{n_tasks}]  finished  n={done[0]}  trial={done[1]}")
-                except Exception as e:
-                    print(f"Error in future: {e}")
+            # keep only successful trials, in order
+            bucket = [r for r in bucket if r is not None]
+            results["trials"][str(ns)] = bucket
 
-    except KeyboardInterrupt:
-        print("Process interrupted! Attempting to clean up...")
-        pool.shutdown(wait=False, cancel_futures=True)
-        sys.exit()
-
-    print(f"\nAll results saved to {filename}\nDone.")
-
-
-def read_synthetic_data(filename):
-    """
-    Reads a synthetic data file and extracts n_samples, alpha values, and beta values.
-    
-    Args:
-        filename (str): Path to the JSON file containing synthetic data
-        
-    Returns:
-        tuple: (n_samples_list, alpha_values, beta_values) where:
-            - n_samples_list is a list of sample sizes
-            - alpha_values is a dict mapping n_samples to list of alpha values
-            - beta_values is a dict mapping n_samples to list of beta values
-    """
-    if not os.path.exists(filename):
-        raise FileNotFoundError(f"Data file not found: {filename}")
-    
-    with open(filename, "r") as f:
-        results = json.load(f)
-    
-    trials = results.get("trials", {})
-    
-    # Extract n_samples (as integers)
-    n_samples_list = sorted([int(ns) for ns in trials.keys()])
-    
-    # Extract alpha and beta values for each n_samples
-    alpha_values = {}
-    beta_values = {}
-    
-    for ns in trials:
-        alpha_values[int(ns)] = [trial["alpha"] for trial in trials[ns]]
-        beta_values[int(ns)] = [trial["beta"] for trial in trials[ns]]
-    
-    return n_samples_list, alpha_values, beta_values
+            if save:
+                with open(filename, "w") as f: json.dump(results, f, indent=2)
+                print(f"  ↳ saved {len(bucket)} trials for n_samples={ns}")
+            alphas = np.array([r['alpha'] for r in bucket])
+            betas = np.array([r['beta'] for r in bucket])
+            print(f"        |α - α_0| = {np.mean(np.abs(alphas - alpha_0)):.3f} ± {np.std(np.abs(alphas - alpha_0)):.3f}")
+            print(f"        |β - β_0| = {np.mean(np.abs(betas - beta_0)):.3f} ± {np.std(np.abs(betas - beta_0)):.3f}")
+    print("\n[INFO]  All experiments finished.")
+    if save: print(f"[INFO]  Full log written to  {filename}")
