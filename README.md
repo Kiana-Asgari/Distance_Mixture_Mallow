@@ -16,12 +16,11 @@ Our simulations show significant improvements achieved by learning the distance 
 |-------|-----------------|--------------|---------------|
 | Estimated $\alpha$ | 0.002 ($\pm$ 0.002) | -- | -- |
 | Estimated $\beta$ | 0.504 ($\pm$ 0.023) | -- | -- |
-| $\uparrow$Spearman's $\rho$ correlation | **0.759** ($\pm$ 0.006) | 0.478 ($\pm$ 0.006) | 0.373 ($\pm$ 0.006) |
-| $\uparrow$Kendall's $\tau$ correlation | **0.564** ($\pm$ 0.005) | 0.328 ($\pm$ 0.005) | 0.253 ($\pm$ 0.004) |
-| $\downarrow$Hamming distance | **0.973** ($\pm$ 0.000) | 0.984 ($\pm$ 0.000) | 0.986 ($\pm$ 0.000) |
-| $\uparrow$Pairwise accuracy (%) | **96.378** ($\pm$ 0.100) | 91.754 ($\pm$ 0.152) | 90.298 ($\pm$ 0.138) |
-| $\uparrow$Top-1 hit rate (%) | **12.873** ($\pm$ 0.941) | 2.212 ($\pm$ 0.807) | 1.749 ($\pm$ 0.250) |
-| $\uparrow$Top-5 hit rate (%) | **56.465** ($\pm$ 2.315) | 10.857 ($\pm$ 1.401) | 7.205 ($\pm$ 0.605) |
+| Spearman's $\rho$ correlation | **0.759** ($\pm$ 0.006) | 0.478 ($\pm$ 0.006) | 0.373 ($\pm$ 0.006) |
+| Kendall's $\tau$ correlation | **0.564** ($\pm$ 0.005) | 0.328 ($\pm$ 0.005) | 0.253 ($\pm$ 0.004) |
+| Pairwise accuracy (%) | **96.378** ($\pm$ 0.100) | 91.754 ($\pm$ 0.152) | 90.298 ($\pm$ 0.138) |
+| Top-1 hit rate (%) | **12.873** ($\pm$ 0.941) | 2.212 ($\pm$ 0.807) | 1.749 ($\pm$ 0.250) |
+| Top-5 hit rate (%) | **56.465** ($\pm$ 2.315) | 10.857 ($\pm$ 1.401) | 7.205 ($\pm$ 0.605) |
 
 *Table: College basketball dataset for 100 teams, model out-of-sample performance averaged over 50 independent trials (mean ± standard deviation). Significant improvements are observed in the correlation metrics, pairwise accuracy, and the top hit rates.*
 
@@ -31,12 +30,11 @@ For the college football dataset, we observed similar improvements:
 |-------|-----------------|--------------|---------------|
 | Estimated $\alpha$ | 0.003 ($\pm$ 0.002) | -- | -- |
 | Estimated $\beta$ | 0.516 ($\pm$ 0.030) | -- | -- |
-| $\uparrow$Spearman's $\rho$ correlation | **0.454** ($\pm$ 0.006) | 0.387 ($\pm$ 0.007) | 0.138 ($\pm$ 0.005) |
-| $\uparrow$Kendall's $\tau$ correlation | **0.318** ($\pm$ 0.004) | 0.264 ($\pm$ 0.005) | 0.093 ($\pm$ 0.004) |
-| $\downarrow$Hamming distance | **0.981** ($\pm$ 0.000) | 0.986 ($\pm$ 0.000) | 0.989 ($\pm$ 0.000) |
-| $\uparrow$Pairwise accuracy (%) | **91.163** ($\pm$ 0.165) | 88.134 ($\pm$ 0.178) | 86.944 ($\pm$ 0.133) |
-| $\uparrow$Top-1 hit rate (%) | **2.057** ($\pm$ 0.535) | 0.294 ($\pm$ 0.399) | 1.524 ($\pm$ 0.899) |
-| $\uparrow$Top-5 hit rate (%) | **23.590** ($\pm$ 3.979) | 2.386 ($\pm$ 1.240) | 7.097 ($\pm$ 1.154) |
+| Spearman's $\rho$ correlation | **0.454** ($\pm$ 0.006) | 0.387 ($\pm$ 0.007) | 0.138 ($\pm$ 0.005) |
+| Kendall's $\tau$ correlation | **0.318** ($\pm$ 0.004) | 0.264 ($\pm$ 0.005) | 0.093 ($\pm$ 0.004) |
+| Pairwise accuracy (%) | **91.163** ($\pm$ 0.165) | 88.134 ($\pm$ 0.178) | 86.944 ($\pm$ 0.133) |
+| Top-1 hit rate (%) | **2.057** ($\pm$ 0.535) | 0.294 ($\pm$ 0.399) | 1.524 ($\pm$ 0.899) |
+| Top-5 hit rate (%) | **23.590** ($\pm$ 3.979) | 2.386 ($\pm$ 1.240) | 7.097 ($\pm$ 1.154) |
 
 *Table: College football dataset for 100 teams, model out-of-sample performance averaged over 50 independent trials (mean ± standard deviation). Again, significant improvements are observed in the correlation metrics, pairwise accuracy, and the top hit rates*
 
