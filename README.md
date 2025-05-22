@@ -43,7 +43,7 @@ python script.py fit-real-world --dataset basketball --n-trials 3 --verbose
 ### Synthetic Data:
 
 ```bash
-python script.py fit-synthetic --n-items 15  --alpha-0 1.5 --beta-0 0.5 --n_train 10 50 200 --truncation 6 --n-trials 4 --verbose
+python script.py fit-synthetic  --alpha-0 1.5 --beta-0 0.5 --n_train 10 50 200 --truncation 6 --n-trials 4 --verbose
 ```
 
 ## 4. Available Arguments
@@ -61,7 +61,6 @@ The script supports two modes:
 | `--mc-samples` | integer | 100 | Number of Monte Carlo samples for testing evaluation metrics |
 | `--seed` | integer | 42 | Random seed for reproducibility |
 | `--n-trials` | integer | 1 | Number of trials to run |
-| `--save` | flag | False | Save results when enabled |
 | `--verbose` | flag | True | Enable verbose output |
 
 ### Synthetic Data Mode (`fit-synthetic`)
@@ -74,6 +73,5 @@ The script supports two modes:
 | `--n_train` | list of integers | [10, 50, 200] | Number of training samples |
 | `--n-trials` | integer | 1 | Number of trials to run for each training size|
 | `--truncation` | integer | 6 | Truncation parameter (choices: 3, 4, 5, 6) |
-| `--save` | flag | False | Save results when enabled |
 | `--verbose` | flag | True | Enable verbose output |
 

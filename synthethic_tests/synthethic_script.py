@@ -1,23 +1,7 @@
-# -*- coding: utf-8 -*-
-"""
-Synthetic-data study:
-    • sample from a truncated Mallow model
-    • estimate consensus + (α,β)
-    • log results in JSON   (one file per parameter grid)
-
-All multiprocessing output is funnelled back to the main process so that
-log lines appear in the natural sequence:
-      n_samples = n₁
-        trial 0 ...
-        trial 1 ...
-      n_samples = n₂
-        …
-"""
-
 import json, os
-from datetime import datetime
-from functools   import partial
-from concurrent.futures import ProcessPoolExecutor, as_completed
+from datetime                               import datetime
+from functools                              import partial
+from concurrent.futures                     import ProcessPoolExecutor, as_completed
 
 import numpy as np
 
@@ -25,8 +9,67 @@ from GMM_diagonalized.sampling             import sample_truncated_mallow
 from MLE.consensus_ranking_estimation      import consensus_ranking_estimation
 from MLE.alpha_beta_estimation             import solve_alpha_beta
 
+from synthethic_tests.plot                import plot_boxplot, plot_vs_n
 
-# ---------------------------------------------------------------------
+
+
+def test_effect_of_n(n_training = 50, alpha_0=1, beta_0=1, n_trials=4, Delta=4,
+                              save=False, verbose=True):
+    n_items_list = [10,20,30,40,50]
+    alpha_error_list = []
+    beta_error_list = []
+    print('starting to test the effect of n')
+    for n_items in n_items_list:
+        print('testing n = ', n_items)
+        results = learn_synthetic_data(n=n_items, 
+                                    Delta=Delta, 
+                                    alpha_0=alpha_0, 
+                                    beta_0=beta_0, 
+                                    n_trials=n_trials,
+                                    num_train_samples=[n_training],
+                                    save=save,
+                                    verbose=verbose)
+        trial_alpha_abs_error = []
+        trial_beta_abs_error = []
+        for i in range(n_trials):
+            trial_alpha_abs_error.append(np.abs(np.array(results["trials"][str(n_training)][i]["alpha"]) - alpha_0))
+            trial_beta_abs_error.append(np.abs(np.array(results["trials"][str(n_training)][i]["beta"]) - beta_0))
+            
+        alpha_error_list.append(trial_alpha_abs_error)
+        beta_error_list.append(trial_beta_abs_error)
+    plot_vs_n(alpha_error_list, beta_error_list, n_items_list)
+    return alpha_error_list, beta_error_list
+
+
+def test_effect_of_truncation(n_training = 50, 
+                              n_items=15, alpha_0=1, beta_0=1, n_trials=25,
+                              save=False, verbose=True):
+    Delta_list = [1,2,3,4,5,6]
+    alpha_error_list = []
+    beta_error_list = []
+    print('starting to test the effect of truncation with n_items = ', n_items, 'and alpha_0 = ', alpha_0, 'and beta_0 = ', beta_0)
+    for Delta in Delta_list:
+        print('testing truncation with Delta = ', Delta)
+        results = learn_synthetic_data(n=n_items, 
+                                    Delta=Delta, 
+                                    alpha_0=alpha_0, 
+                                    beta_0=beta_0, 
+                                    n_trials=n_trials,
+                                    num_train_samples=[n_training],
+                                    save=save,
+                                    verbose=verbose)
+        trial_alpha_abs_error = []
+        trial_beta_abs_error = []
+        for i in range(n_trials):
+            trial_alpha_abs_error.append(np.abs(np.array(results["trials"][str(n_training)][i]["alpha"]) - alpha_0))
+            trial_beta_abs_error.append(np.abs(np.array(results["trials"][str(n_training)][i]["beta"]) - beta_0))
+            
+        alpha_error_list.append(trial_alpha_abs_error)
+        beta_error_list.append(trial_beta_abs_error)
+    plot_boxplot(alpha_error_list, beta_error_list, Delta_list)
+    return alpha_error_list, beta_error_list
+
+
 # Single worker (runs in its own process – keep **quiet**!)
 # ---------------------------------------------------------------------
 def _single_trial(num_samples, trial,
@@ -39,8 +82,8 @@ def _single_trial(num_samples, trial,
         # ---------- sampling ----------
         train = sample_truncated_mallow(num_samples=num_samples,
                                         n=n, beta=beta_0, alpha=alpha_0,
-                                        sigma=sigma_0, Delta=Delta,
-                                        rng_seed=trial)
+                                        sigma=sigma_0, Delta=7,
+                                        rng_seed=trial+42)
 
         # ---------- estimation ----------
         consensus        = consensus_ranking_estimation(train)
@@ -70,7 +113,7 @@ def learn_synthetic_data(*,
         alpha_0          = 1.5,
         num_train_samples= np.arange(15, 350, 5),
         n_trials         = 50,
-        max_workers      = 4,
+        max_workers      = 16,
         save             = True, 
         verbose          = True):
     if verbose:
@@ -153,3 +196,6 @@ def learn_synthetic_data(*,
             print(f"        |β - β_0| = {np.mean(np.abs(betas - beta_0)):.3f} ± {np.std(np.abs(betas - beta_0)):.3f}")
     print("\n[INFO]  All experiments finished.")
     if save: print(f"[INFO]  Full log written to  {filename}")
+    return results
+
+
