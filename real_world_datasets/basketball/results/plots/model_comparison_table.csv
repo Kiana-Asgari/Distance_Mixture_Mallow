@@ -1,0 +1,9 @@
+Metric,$L_{\alpha}$-Mallow,Mallow's $\tau$,Plackett--Luce
+Estimated $\alpha$,0.001 (± 0.002),--,--
+Estimated $\beta$,0.516 (± 0.024),--,--
+$\uparrow$Spearman's $\rho$ correlation,0.758 (± 0.006),0.418 (± 0.005),0.481 (± 0.004)
+$\uparrow$Kendall's $\tau$ correlation,0.564 (± 0.005),0.287 (± 0.004),0.331 (± 0.003)
+$\downarrow$Hamming distance,0.973 (± 0.000),0.985 (± 0.000),0.984 (± 0.000)
+$\uparrow$Pairwise accuracy (%),78.2 (± 0.3),64.3 (± 0.2),66.5 (± 0.1)
+$\uparrow$Top-1 hit rate (%),14.3 (± 0.6),3.2 (± 0.1),2.4 (± 0.2)
+$\uparrow$Top-5 hit rate (%),52.0 (± 1.7),14.6 (± 0.3),11.1 (± 0.8)
