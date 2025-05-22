@@ -1,16 +1,16 @@
 # Project Overview and the Results
-This repository contains the code for the paper *Mallows Model with Learned Distance Metrics: Sampling and Maximum Likelihood Estimation* ("arxive Link?").
+This repository contains the code for the paper *Mallows Model with Learned Distance Metrics: Sampling and Maximum Likelihood Estimation* ("arxiv Link?").
 
-In this work, we present a new statistical model for learning the underlying ranking (prefrence) from observed empirical rankings and comparing it to the other models. We also prove theoretical guarantees for convergence and the efficiency of our learning method. 
+In this work, we present a new statistical model for learning the underlying ranking (preference) from observed empirical rankings and comparing it to other models. We also prove theoretical guarantees for convergence and the efficiency of our learning method. 
 
 Models in this repository include:
->>• $L_\alpha$ Mallows (Distance Mixture model):
+>• $L_\alpha$ Mallows (Distance Mixture model):
   $$P_{\alpha,\beta}(\pi) = \frac{1}{Z_{\alpha,\beta}} \exp\{ -\beta d_\alpha(\pi, \sigma_0) \} $$,
   where $d_\alpha(\pi, \sigma_0) = \sum_{i=1}^n |\pi(i) - \sigma_0(i)|^\alpha $
->>
->>• Mallows's model with Kendall $\tau$ distance
->>
->>• Plackett-Luce model
+>
+>• Mallows's model with Kendall $\tau$ distance
+>
+>• Plackett-Luce model
 
 Our simulations show significant improvements achieved by learning the distance metric in the $L_\alpha$ Mallows model over famous models such as Plackett-Luce and Mallows's model with Kendall $\tau$ distance. The table below shows results for the college basketball dataset:
 
@@ -53,7 +53,7 @@ git clone "link"
 cd Generalized_Mallow_Learning
 ```
 
-If you face difficulties with git, you can manually download and unzip the repository from the project page.
+>If you face difficulties with git, you can manually download and unzip the repository from the project page.
 
 ## 1. Installing Requirements
 
@@ -65,7 +65,7 @@ conda activate myenv
 pip install -r requirements.txt
 ```
 
-If you face issues with conda, you can alternatively use Python's built-in venv:
+>If you face issues with conda, you can alternatively use Python's built-in venv:
 
 ```bash
 # on windows:
@@ -80,7 +80,7 @@ pip install -r requirements.txt
 
 ## 2. Kaggle Authentication for College Sport Data
 
-To access college sport datasets, you need to have your Kaggle API credentials set.
+To access college sports datasets, you need to have your *Kaggle* API credentials set.
 
 ## 3. Example Usage
 
