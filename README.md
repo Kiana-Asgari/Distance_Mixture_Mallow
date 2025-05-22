@@ -1,90 +1,79 @@
 # Project Setup and Usage Guide
+This repository contains the code for the paper *Mallows Model with Learned Distance Metrics: Sampling and Maximum Likelihood Estimation*.
+
+
+## 0. Setup
+First, clone the repository and navigate to the project directory:
+```bash
+git clone "link"
+cd Generalized_Mallow_Learning
+```
 
 ## 1. Installing Requirements
 
 Install all necessary dependencies using the requirements file:
 
 ```bash
-conda create -n myenv python=3.8
+conda create -n myenv python
 conda activate myenv
 pip install -r requirements.txt
 ```
 
 ## 2. Kaggle Authentication for College Sport Data
 
-To access college sport datasets, you need to authenticate with Kaggle:
+To access college sport datasets, you need to have your Kaggle API credentials set.
 
-1. Create a Kaggle account at [kaggle.com](https://www.kaggle.com) if you don't have one
-2. Go to your account settings (click on your profile picture → "Account")
-3. Scroll down to the API section and click "Create New API Token"
-4. This downloads a `kaggle.json` file
-5. Place this file in the `~/.kaggle/` directory:
-   ```bash
-   mkdir -p ~/.kaggle/
-   cp path/to/kaggle.json ~/.kaggle/
-   chmod 600 ~/.kaggle/kaggle.json  # Set appropriate permissions
-   ```
+## 3. Example Usage
 
-## 3. Script Arguments
-
-The script supports two modes: `fit` and `evaluate`, each with its own set of parameters:
-
-### Available Arguments
-
-| Mode | Parameter | Type | Default | Description |
-|------|-----------|------|---------|-------------|
-| `fit` | `--dataset` | string | sushi | Dataset name to use |
-| `fit` | `--n-teams` | integer | 100 | Number of teams to use |
-| `fit` | `--delta` | float | 7 | Delta parameter value |
-| `fit` | `--mc-samples` | integer | 100 | Number of Monte Carlo samples |
-| `fit` | `--seed` | integer | 42 | Random seed for reproducibility |
-| `fit` | `--n-trials` | integer | 1 | Number of trials to run |
-| `fit` | `--save` | flag | False | Save results when enabled |
-| `fit` | `--verbose` | flag | True | Enable verbose output |
-| `evaluate` | `--dataset` | string | football | Dataset name for evaluation |
-| `evaluate` | `--n-items` | integer | 100 | Number of items to evaluate |
-
-## 4. Running the Script
-
-### To fit models with default parameters:
-
+### Real-World Dataset: sushi
 ```bash
-python script.py fit
+python script.py fit-real-world --dataset sushi --n-trials 3 --verbose
 ```
 
-### To fit models with custom parameters:
-
+### Real-World Dataset: football
 ```bash
-python script.py fit --dataset sushi --n-teams 20 --delta 5.0 --mc-samples 200 --seed 123 --n-trials 3 --save
+python script.py fit-real-world --dataset football --n-trials 3 --verbose
 ```
 
-### To evaluate results with default parameters:
-
+### Real-World Dataset: basketball
 ```bash
-python script.py evaluate
+python script.py fit-real-world --dataset basketball --n-trials 3 --verbose
 ```
 
-### To evaluate with custom parameters:
+### Synthetic Data:
 
 ```bash
-python script.py evaluate --dataset football --n-items 50
+python script.py fit-synthetic --n-items 15  --alpha-0 1.5 --beta-0 0.5 --n_train 10 50 200 --truncation 6 --n-trials 4 --verbose
 ```
 
-### Getting help:
+## 4. Available Arguments
+The script supports two modes:
+- `fit-real-world`: Fits models on real-world datasets (sushi, football, basketball)
+- `fit-synthetic`: Fits models on synthetic data
 
-```bash
-python script.py --help
-```
+### Real-World Dataset Mode (`fit-real-world`)
 
-For mode-specific help:
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `--dataset` | string | sushi | Dataset name to use (sushi, football, basketball) |
+| `--n-teams` | integer | 100 | Number of teams to use |
+| `--truncation` | integer | 7 | Truncation parameter value (choices: 5, 6, 7) |
+| `--mc-samples` | integer | 100 | Number of Monte Carlo samples for testing evaluation metrics |
+| `--seed` | integer | 42 | Random seed for reproducibility |
+| `--n-trials` | integer | 1 | Number of trials to run |
+| `--save` | flag | False | Save results when enabled |
+| `--verbose` | flag | True | Enable verbose output |
 
-```bash
-python script.py fit --help
-```
+### Synthetic Data Mode (`fit-synthetic`)
 
-or
-```bash
-python script.py evaluate --help
-```
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `--n-items` | integer | 15 | Number of items (choices: 10, 15, 20) |
+| `--alpha-0` | float | 1.5 | Alpha_0 parameter |
+| `--beta-0` | float | 0.5 | Beta_0 parameter |
+| `--n_train` | list of integers | [10, 50, 200] | Number of training samples |
+| `--n-trials` | integer | 1 | Number of trials to run for each training size|
+| `--truncation` | integer | 6 | Truncation parameter (choices: 3, 4, 5, 6) |
+| `--save` | flag | False | Save results when enabled |
+| `--verbose` | flag | True | Enable verbose output |
 
-The output will be displayed in a fancy grid format for better readability, showing performance metrics across different models.
