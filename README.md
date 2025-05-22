@@ -1,5 +1,5 @@
 # Project Overview and the Results
-This repository contains the code for the paper *Mallows Model with Learned Distance Metrics: Sampling and Maximum Likelihood Estimation* ("arxiv Link?").
+This repository contains the code for the paper **Mallows Model with Learned Distance Metrics: Sampling and Maximum Likelihood Estimation** ("arxiv Link?").
 
 In this work, we present a new statistical model for learning the underlying ranking (preference) from observed empirical rankings and comparing it to other models. We also prove theoretical guarantees for convergence and the efficiency of our learning method. 
 
