@@ -115,5 +115,5 @@ def chose_most_common_teams(rankings_by_name, n_teams_to_keep):
     # Count occurrences of each team
     team_counts = Counter(all_teams)
     selected_teams = [team for team, count in team_counts.most_common(n_teams_to_keep)]
-    print('football chosen teams:', selected_teams)
+    print(f'football chosen teams (the first 5 out of {len(all_teams)}):', selected_teams[:5])
     return selected_teams
