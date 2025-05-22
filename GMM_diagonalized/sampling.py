@@ -171,8 +171,8 @@ def sample_permutation_from_dp(n, k, graph, DP, states_by_layer, rng_seed=None):
 import concurrent.futures
 import sys
 # Version 2: Generate multiple samples in parallel using concurrent.futures
-def sample_many_parallel(n, k, graph, DP, states_by_layer, sigma, num_samples=100, max_workers=6, base_seed=42):
-    if max_workers > 6:
+def sample_many_parallel(n, k, graph, DP, states_by_layer, sigma, num_samples=100, max_workers=32, base_seed=42):
+    if max_workers > 32:
         print('max_workers must be less than 6')
         sys.exit()
 

@@ -2,165 +2,116 @@ import numpy as np
 from scipy.optimize import minimize
 
 
+# ----------------------------------------------------------------------
+#  High-level helper
+# ----------------------------------------------------------------------
 def learn_PL(permutations_train, permutations_test):
-    # Fit Plackett-Luce model
+    """
+    Fit a Plackett–Luce model and return (utilities , normalised-NLL on test set).
+    """
     model = PlackettLuceModel(permutations_train)
-    estimated_utilities = model.fit()
-    
-    # Compute normalized negative log-likelihood
-    normalized_nll = model.compute_normalized_nll(permutations_test, estimated_utilities)
-    return estimated_utilities, normalized_nll
+    est_utils = model.fit()
+    nll = model.compute_normalized_nll(permutations_test, est_utils)
+    return est_utils, nll
 
 
+# ----------------------------------------------------------------------
+#  Plackett–Luce model class
+# ----------------------------------------------------------------------
 class PlackettLuceModel:
-    def __init__(self, rankings):
+    """
+    Maximum-likelihood learning for the Plackett–Luce model, written entirely
+    with vectorised NumPy (no Python loops in the likelihood any more).
+    """
+
+    def __init__(self, rankings: np.ndarray):
         """
-        Initialize Plackett-Luce model with full ranking data
-        
-        Parameters:
-        -----------
-        rankings : numpy.ndarray
-            2D array where each row represents a full ranking of items
-            Shape: (n_rankings, n_items)
+        Parameters
+        ----------
+        rankings : (n_rankings , n_items) int ndarray
+            Each row is a full ranking from *best* (col 0) to *worst* (last col).
+            Item values are indices 0 … n_items-1.
         """
         self.rankings = rankings
-        self.n_items = rankings.shape[1]
-    
-    def negative_log_likelihood(self, params):
+        self.n_items  = rankings.shape[1]
+
+    # -----------------------------
+    #  Vectorised negative log-likelihood
+    # -----------------------------
+    def negative_log_likelihood(self, params: np.ndarray) -> float:
         """
-        Compute negative log-likelihood for Plackett-Luce model
-        
-        Parameters:
-        -----------
-        params : numpy.ndarray
-            Item utility parameters
-        
-        Returns:
-        --------
-        float: Negative log-likelihood
+        Vectorised implementation of
+
+            L(θ) = − Σ_r Σ_{m=0}^{n−2} log  exp(θ_{π_r[m]}) /
+                                                Σ_{j≥m} exp(θ_{π_r[j]})
+
+        where π_r is ranking r.
         """
-        log_likelihood = 0
-        
-        for ranking in self.rankings:
-            for i in range(len(ranking) - 1):  # -1 because last position is deterministic
-                # Get utilities for remaining items
-                remaining_items = ranking[i:]
-                utilities = np.exp(params[remaining_items])
-                
-                # Probability of selecting item i from remaining items
-                # P(πᵢ) = exp(θᵢ) / Σ(exp(θⱼ)) for remaining items j
-                ranking_ll = np.log(utilities[0] / np.sum(utilities))
-                log_likelihood += ranking_ll
-        
-        return -log_likelihood
-    
-    def fit(self, initial_guess=None):
-        """
-        Fit Plackett-Luce model using maximum likelihood estimation
-        
-        Parameters:
-        -----------
-        initial_guess : numpy.ndarray, optional
-            Initial guess for item utilities. 
-            If None, uses zeros as initial guess.
-        
-        Returns:
-        --------
-        numpy.ndarray: Estimated item utility parameters
-        """
+        exp_theta   = np.exp(params)                   # (n_items,)
+        exp_utils   = exp_theta[self.rankings]         # (R , n)
+
+        # Denominator: reverse cumulative sums so that
+        # denom[r, m] = Σ_{j=m}^{n−1} exp(θ_{π_r[j]})
+        denom = np.flip(np.cumsum(np.flip(exp_utils, axis=1), axis=1), axis=1)
+
+        # Exclude the last deterministic choice (prob = 1)
+        numer       = exp_utils[:, :-1]
+        denom       = denom[:, :-1]
+
+        nll_matrix  = np.log(denom) - np.log(numer)    # (R , n−1)
+        return nll_matrix.sum()                       # scalar
+
+    # -----------------------------
+    #  MLE fit
+    # -----------------------------
+    def fit(self, initial_guess: np.ndarray | None = None) -> np.ndarray:
         if initial_guess is None:
             initial_guess = np.zeros(self.n_items)
-        
-        # Bounds to ensure positive utilities
-        bounds = [(None, None) for _ in range(self.n_items)]
-        
-        # Minimize negative log-likelihood
-        result = minimize(
-            self.negative_log_likelihood, 
-            initial_guess, 
+
+        # Simple progress print-out
+        step = {'i': 0}
+        def cb(xk):
+            step['i'] += 1
+            print(f"Iter {step['i']:3d}  NLL = {self.negative_log_likelihood(xk):.4f}")
+
+        res = minimize(
+            self.negative_log_likelihood,
+            initial_guess,
             method='L-BFGS-B',
-            bounds=bounds
+            callback=cb,
+            options={'maxiter': 1000, 'disp': False}
         )
-        
-        return result.x
-    
-    def predict_ranking_probability(self, ranking, utilities):
-        """
-        Compute probability of a specific ranking
-        
-        Parameters:
-        -----------
-        ranking : numpy.ndarray
-            Specific ranking to compute probability for
-        utilities : numpy.ndarray
-            Estimated item utilities
-        
-        Returns:
-        --------
-        float: Probability of the given ranking
-        """
-        exp_utilities = np.exp(utilities[ranking])
-        numerator = exp_utilities[0]
-        denominator = np.sum(exp_utilities)
-        return numerator / denominator
-    
-    def compute_normalized_nll(self, permutations_test, estimated_utilities):
-        """
-        Compute normalized negative log-likelihood for test permutations
-        
-        Parameters:
-        -----------
-        permutations_test : numpy.ndarray
-            Test permutations to evaluate
-            Shape: (n_test_permutations, n_items)
-        estimated_utilities : numpy.ndarray
-            Estimated item utility parameters from training
-        
-        Returns:
-        --------
-        float: Normalized negative log-likelihood
-        """
-        total_nll = 0
-        
-        for ranking in permutations_test:
-            ranking_nll = 0
-            for i in range(len(ranking) - 1):
-                # Get utilities for remaining items
-                remaining_items = ranking[i:]
-                exp_utilities = np.exp(estimated_utilities[remaining_items])
-                
-                # Compute negative log-likelihood for each position
-                nll = -np.log(exp_utilities[0] / np.sum(exp_utilities))
-                ranking_nll += nll
-            total_nll += ranking_nll
-        
-        # Normalize by number of test permutations
-        return total_nll / len(permutations_test)
-    
+        return res.x
+
+    # -----------------------------
+    #  Vectorised test NLL
+    # -----------------------------
+    @staticmethod
+    def _matrix_nll(perms: np.ndarray, utilities: np.ndarray) -> float:
+        """Shared helper used by both train- and test-NLL routines."""
+        exp_theta = np.exp(utilities)
+        exp_utils = exp_theta[perms]
+        denom = np.flip(np.cumsum(np.flip(exp_utils, axis=1), axis=1), axis=1)
+        nll = np.log(denom[:, :-1]) - np.log(exp_utils[:, :-1])
+        return nll.sum()
+
+    def compute_normalized_nll(
+        self, permutations_test: np.ndarray, estimated_utilities: np.ndarray
+    ) -> float:
+        total_nll = self._matrix_nll(permutations_test, estimated_utilities)
+        return total_nll / permutations_test.shape[0]
 
 
-def sample_PL(utilities, n_samples=1000):
+# ----------------------------------------------------------------------
+#  Fully-vectorised Plackett–Luce sampler (Gumbel–Max)
+# ----------------------------------------------------------------------
+def sample_PL(utilities: np.ndarray, n_samples: int = 1000, rng=None) -> np.ndarray:
     """
-    Sample permutations from the Plackett-Luce distribution given the item utilities.
-    Position 0 in each permutation = *least* preferred item.
+    Draw `n_samples` permutations *simultaneously* using the Gumbel–Max trick.
+
+    Each row is a ranking from best (col 0) to worst (last col).
     """
-    n_items = len(utilities)
-    permutations = np.zeros((n_samples, n_items), dtype=int)
-
-    for s in range(n_samples):
-        available_items = list(range(n_items))
-        # We'll keep track of chosen items in order from best to worst
-        chosen_items_in_order = []
-
-        for _ in range(n_items):
-            exp_values = np.exp(utilities[available_items])
-            probabilities = exp_values / np.sum(exp_values)
-            chosen_index = np.random.choice(len(available_items), p=probabilities)
-            chosen_item = available_items.pop(chosen_index)
-            chosen_items_in_order.append(chosen_item)
-
-        # Reverse so that index 0 is the worst, and the last index is the best
-        #chosen_items_in_order.reverse()
-        permutations[s, :] = chosen_items_in_order
-
-    return permutations
+    rng = rng or np.random.default_rng()
+    gumbels   = rng.gumbel(size=(n_samples, len(utilities)))
+    scores    = utilities + gumbels                      # broadcast add
+    return np.argsort(-scores, axis=1).astype(np.int64)  # descending ⇒ best first

@@ -1,7 +1,17 @@
 from matplotlib import pyplot as plt
 import numpy as np
 from GMM_diagonalized.sampling import sample_truncated_mallow
+from tabulate import tabulate
 
+
+
+
+
+
+
+####################################
+# Plotting utils
+####################################
 def set_publication_style():
     plt.rcParams.update({
         'text.usetex': True,
@@ -56,5 +66,7 @@ def plot_marginal_heamap(n, alpha, beta, Delta):
     
     plt.tight_layout()
     plt.savefig(f"marginal_counts_{n}_{alpha}_{beta}_{Delta}.pdf", bbox_inches='tight')
+
+
 
 
