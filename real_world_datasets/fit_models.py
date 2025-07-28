@@ -1,6 +1,7 @@
 from __future__ import annotations
 from pathlib import Path
 import json
+from benchmark import fit_weighted_kendal
 import numpy as np
 
 # ── data & utils ────────────────────────────────────────────────────────────────
@@ -22,6 +23,9 @@ from benchmark.fit_Mallow_kendal import learn_kendal, sample_kendal
 # ── common evaluation ─────────────────────────────────────────────────────────
 from MLE.top_k import evaluate_metrics
 from real_world_datasets.config import METRIC_NAMES
+
+# ── Weighted Kendall ────────────────────────────────────────────────────────────
+from benchmark.fit_weighted_kendal import learn_weighted_kendal, sample_weighted_kendal
 
 
 #####################################################
@@ -74,6 +78,10 @@ def fit_models(
         kendall = fit_kendall(train, test, mc_samples, say)
         trial.update(kendall)
 
+        # Weighted Kendall
+        weighted_kendall = fit_weighted_kendal(train, test, mc_samples, say)
+        trial.update(weighted_kendall)
+
         results.append(trial)
         if save:
             res_path.write_text(json.dumps(convert_numpy_to_native(results), indent=2))
@@ -111,9 +119,9 @@ def fit_mallows(train, test, k, mc, delta, say):
 
 def fit_pl(train, test, mc, say):
     if len(train[0]) > 20: 
-        say(f"  [2/3] Starting to learn Plackett-Luce model. This may take a while for {len(train[0])} items ...")
+        say(f"  [2/4] Starting to learn Plackett-Luce model. This may take a while for {len(train[0])} items ...")
     else:
-        say(f"  [2/3] Starting to learn Plackett-Luce model.")
+        say(f"  [2/4] Starting to learn Plackett-Luce model.")
     util, _ = learn_PL(train - 1, test - 1)
     say(f"        Plackett-Luce is learned.")
     say(f"        Testing the PL model with {mc} samples...")
@@ -127,9 +135,9 @@ def fit_pl(train, test, mc, say):
 
 def fit_kendall(train, test, mc, say): 
     if len(train[0]) > 20:
-        say(f"  [3/3] Starting to learn Kendall model. This may take a while for {len(train[0])} items ...")
+        say(f"  [3/4] Starting to learn Kendall model. This may take a while for {len(train[0])} items ...")
     else:
-        say(f"  [3/3] Starting to learn Kendall model.")
+        say(f"  [3/4] Starting to learn Kendall model.")
     sigma_0, theta, _ = learn_kendal(train - 1, test - 1)
     say(f"        Kendall is learned with theta: {theta:.4f}.")
     say(f"        testing the Kendall model with {mc} samples...")
@@ -138,6 +146,24 @@ def fit_kendall(train, test, mc, say):
     evals = evaluate_metrics(test, samples)
     full_trial_results = {**pack(*evals, suffix="_kendal"), "sigma_0_kendal": sigma_0, "theta_kendal": theta}
     say(f"             top-1 hit rate: {full_trial_results['top_k_hit_rates_kendal'][0]:.4f}")
+    return full_trial_results
+
+
+
+
+def fit_weighted_kendal(train, test, mc, say): 
+    if len(train[0]) > 20:
+        say(f"  [4/4] Starting to learn Weighted Kendall model. This may take a while for {len(train[0])} items ...")
+    else:
+        say(f"  [4/4] Starting to learn Weighted Kendall model.")
+    sigma_0, theta, _ = learn_weighted_kendal(train - 1, test - 1)
+    say(f"        Weighted Kendall is learned with theta: {theta:.4f}.")
+    say(f"        testing the Weighted Kendall model with {mc} samples...")
+    # testing the model ...
+    samples = sample_weighted_kendal(sigma_0=sigma_0, theta=theta, num_samples=mc)
+    evals = evaluate_metrics(test, samples)
+    full_trial_results = {**pack(*evals, suffix="_wkendal"), "sigma_0_wkendal": sigma_0, "theta_wkendal": theta}
+    say(f"             top-1 hit rate: {full_trial_results['top_k_hit_rates_wkendal'][0]:.4f}")
     return full_trial_results
 
 def pack(*vals, suffix=""):            # names metrics[0] → f"{prefix}metric_name"

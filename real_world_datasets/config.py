@@ -45,9 +45,9 @@ FILES = {
 
 
 
-MODEL_LABEL     = {'Original L1': 'ML', 'Plackett-Luce': 'PL', 'Kendall': 'kendal'}
+MODEL_LABEL     = {'Original L1': 'ML', 'Plackett-Luce': 'PL', 'Kendall': 'kendal', 'Weighted Kendall': 'wkendal'}
 MODEL_NICE_NAME = {'Original L1': 'L_α-Mallows', 'Plackett-Luce': 'Plackett–Luce',
-                'Kendall': "Mallows τ"}
+                'Kendall': "Mallows τ", 'Weighted Kendall': "Weighted Kendall"}
 
 METRICS_NICE_NAMES = {                       # key-template,   ↑/↓ label,  display-factor
     'spearman_rho':  ('spearman_rho_{}',   "↑ Spearman's ρ",    1),
