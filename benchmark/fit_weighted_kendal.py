@@ -16,7 +16,7 @@ def compute_dcg_deltas(n):
     for i in range(n):
         d1 = 1.0 / math.log2(i + 2)       # 1 / log2(i+2)
         d2 = 1.0 / math.log2(i + 3)       # 1 / log2(i+3)
-        deltas.append(d2-d1)
+        deltas.append(d2-d1)  # just use different deltas for different approaches
     return deltas
 
 
