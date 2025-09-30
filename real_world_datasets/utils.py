@@ -5,9 +5,10 @@ from real_world_datasets.config import MODEL_LABEL, MODEL_NICE_NAME, METRICS_NIC
 
 
 
-def train_split(sushi_data, train_size, seed):
+def train_split(sushi_data, train_ratio, seed):
     # Randomly select indices for training using the RNG
     # Initialize random number generator with seed
+    train_size = int(len(sushi_data) * train_ratio)
     rng = default_rng(seed)
     all_indices = np.arange(len(sushi_data))
     rng.shuffle(all_indices)
@@ -15,9 +16,16 @@ def train_split(sushi_data, train_size, seed):
     test_indices = all_indices[train_size:]
     
     # Split data into training and testing sets
-    train_data = sushi_data[train_indices]
-    test_data = sushi_data[test_indices]
-    return train_data, test_data, train_indices, test_indices
+    # Handle both numpy arrays and lists
+    if isinstance(sushi_data, np.ndarray):
+        train_data = sushi_data[train_indices]
+        test_data = sushi_data[test_indices]
+    else:
+        # For lists or other iterables, use list comprehension
+        train_data = [sushi_data[i] for i in train_indices]
+        test_data = [sushi_data[i] for i in test_indices]
+    
+    return np.asarray(train_data), np.asarray(test_data), np.asarray(train_indices), np.asarray(test_indices)
 
 
 
@@ -76,10 +84,32 @@ def convert_numpy_to_native(obj):
 def make_table(trials):
     rows = []
 
-    # α and β belong to Original L1 only
+    # α and β belong to Original L1 (ML), Mallows Footrule (footrule), and Mallows Spearman (spearman)
     for p in ('alpha', 'beta'):
         arr = _fetch(trials, p)
-        rows.append([f"Estimated {p}"] + [_col(arr)] + ['--', '--'])
+        arr_footrule = _fetch(trials, f"{p}_footrule")
+        arr_spearman = _fetch(trials, f"{p}_spearman")
+        
+        # Debug: Check if spearman values are being found
+        if len(trials) > 0 and f"{p}_spearman" in trials[0]:
+            print(f"Found {p}_spearman values: {arr_spearman}")
+        
+        # Debug: Print the first few values to check if they're being found
+        if len(trials) > 0:
+            print(f"Debug: {p}_spearman values found: {arr_spearman[:3]}")  # Show first 3 values
+        
+        # Create row with alpha/beta for ML, footrule, and spearman models, '--' for others
+        row = [f"Estimated {p}"]
+        for m in MODEL_LABEL:
+            if MODEL_LABEL[m] == 'ML':  # L_α-Mallows
+                row.append(_col(arr))
+            elif MODEL_LABEL[m] == 'footrule':  # L₁-Mallows
+                row.append(_col(arr_footrule))
+            elif MODEL_LABEL[m] == 'spearman':  # L₂-Mallows
+                row.append(_col(arr_spearman))
+            else:
+                row.append('--')
+        rows.append(row)
 
     for name, (template, label, scale) in METRICS_NICE_NAMES.items():
         if name == 'top_k':           # need columns for k = 1 and 5
@@ -102,4 +132,8 @@ def _col(values, scale=1):
 
 
 def _fetch(trials, key):
-    return np.array([t[key] for t in trials])
+    try:
+        return np.array([t[key] for t in trials])
+    except KeyError:
+        # If key doesn't exist, return array of zeros with same length as trials
+        return np.zeros(len(trials))

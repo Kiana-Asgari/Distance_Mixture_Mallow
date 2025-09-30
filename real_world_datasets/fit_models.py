@@ -2,6 +2,7 @@ from __future__ import annotations
 from pathlib import Path
 import json
 import numpy as np
+import sys
 
 # ── data & utils ────────────────────────────────────────────────────────────────
 from real_world_datasets.college_sports.load_data import load_data
@@ -18,6 +19,9 @@ from GMM_diagonalized.sampling import sample_truncated_mallow
 # ── Plackett–Luce & Kendall ────────────────────────────────────────────────────
 from benchmark.fit_placket_luce import learn_PL, sample_PL
 from benchmark.fit_Mallow_kendal import learn_kendal, sample_kendal
+
+from real_world_datasets.movie_lens.load_MovieLens import load_and_return_ratings_movies
+from real_world_datasets.news.load_news import load_news_data
 
 # ── common evaluation ─────────────────────────────────────────────────────────
 from MLE.top_k import evaluate_metrics
@@ -37,15 +41,22 @@ def fit_models(
     n_teams: int = 10,
     mc_samples: int = 10_000,
     save: bool = False,
-    verbose: bool = True,
+    verbose: bool = True
     ):
 
+
+    
     say = print if verbose else (lambda *_, **__: None) # print if verbose else do nothing
     if dataset_name == 'sushi':
         data = load_sushi()
+    elif dataset_name == 'movie_lens':
+        data = load_and_return_ratings_movies(n_movies=n_teams)
+    elif dataset_name == 'news':
+        data = load_news_data(n_items_to_keep=n_teams)
     else:
         data = load_data(dataset_name=dataset_name, n_teams_to_keep=n_teams)
-        
+        print('first ranking:', data[0])
+
     res_path = Path(f"real_world_datasets/results/{dataset_name}_n_teams={n_teams}.json")
     res_path.parent.mkdir(parents=True, exist_ok=True) # create the directory if it doesn't exist
     if save==True:
@@ -55,8 +66,14 @@ def fit_models(
 
     for t in range(len(results), n_trials):
         say(f"Trial {t + 1}/{n_trials}")
-        train, test, *_ = chronologically_train_split(data, seed + t)
-        say(f"  train and test data shape: {train.shape}, {test.shape}")
+        if dataset_name == 'movie_lens' or dataset_name == 'news':
+            train, test, *_ = train_split(data, 0.8, seed + t)
+        else:
+             train, test, *_ = chronologically_train_split(data, seed + t)
+        # Handle both numpy arrays and lists for shape reporting
+        train_shape = train.shape if hasattr(train, 'shape') else f"list({len(train)})"
+        test_shape = test.shape if hasattr(test, 'shape') else f"list({len(test)})"
+        say(f"  train and test data shape: {train_shape}, {test_shape}")
         trial = {
             "full_data_size": len(data),
             "train_size": len(train),
@@ -64,11 +81,24 @@ def fit_models(
         }
 
         # Mallows (L-α)
-        mallows = fit_mallows(train, test, n_teams, mc_samples, Delta, say)
+        mallows = fit_mallows(train, test, n_teams, mc_samples, Delta, say, alpha_fixed=False)
         trial.update(mallows)
+
+        # Mallows Footrule (L₁)
+        footrule = fit_mallows(train, test, n_teams, mc_samples, Delta, say, alpha_fixed=True)
+        trial.update(footrule)
+
+        # Mallows Spearman's ρ (α=2)
+        spearman = fit_mallows(train, test, n_teams, mc_samples, Delta, say, alpha_fixed=True, alpha_fixed_value=2)
+        trial.update(spearman)
+        
         # Plackett–Luce
         PL = fit_pl(train, test, mc_samples, say)
         trial.update(PL)
+
+        # Regularized Plackett–Luce
+        PL_reg = fit_pl_reg(train, test, mc_samples, say)
+        trial.update(PL_reg)
 
         # Kendall
         kendall = fit_kendall(train, test, mc_samples, say)
@@ -89,13 +119,14 @@ def fit_models(
 
 
 
-def fit_mallows(train, test, k, mc, delta, say):
+def fit_mallows(train, test, k, mc, delta, say, alpha_fixed=False, alpha_fixed_value=1):
     if len(train[0]) > 20:
         say(f"  [1/3] Starting to learn L-α Mallows model. This may take a while for {len(train[0])} items ...")
     else:
         say(f"  [1/3] Starting to learn L-α Mallows model.")
     sigma_0 = consensus_ranking_estimation(train)
-    alpha, beta = solve_alpha_beta(train, sigma_0, Delta=delta)
+    alpha, beta = solve_alpha_beta(train, sigma_0, Delta=delta, fixed_alpha=alpha_fixed, fixed_alpha_value=alpha_fixed_value)
+
     say(f"        L-α Mallows is learned with alpha: {alpha:.4f}, beta: {beta:.4f}")
     say(f"        testing the Mallows model with {mc} samples...")
     # testing the model ...
@@ -105,8 +136,18 @@ def fit_mallows(train, test, k, mc, delta, say):
         Delta_mc = 7
     samples = sample_truncated_mallow(n=k, alpha=alpha, beta=beta, sigma=sigma_0, Delta=Delta_mc, num_samples=mc)
     evals = evaluate_metrics(test, samples)
-    full_trial_results = {"sigma_0": sigma_0, "alpha": alpha, "beta": beta, **pack(*evals, suffix="_ML")}
-    say(f"             top-1 hit rate: {full_trial_results['top_k_hit_rates_ML'][0]:.4f}")
+    if alpha_fixed:
+        if alpha_fixed_value == 2:  # Spearman's ρ model
+            suffix = "_spearman"
+            full_trial_results = {"sigma_0_spearman": sigma_0, "alpha_spearman": alpha, "beta_spearman": beta, **pack(*evals, suffix=suffix)}
+            say(f"        Spearman's ρ model (α=2) learned with beta: {beta:.4f}")
+        else:  # Footrule model
+            suffix = "_footrule"
+            full_trial_results = {"sigma_0_footrule": sigma_0, "alpha_footrule": alpha, "beta_footrule": beta, **pack(*evals, suffix=suffix)}
+    else:
+        suffix = "_ML"
+        full_trial_results = {"sigma_0": sigma_0, "alpha": alpha, "beta": beta, **pack(*evals, suffix=suffix)}
+    say(f"             top-1 hit rate: {full_trial_results[f'top_k_hit_rates{suffix}'][0]:.4f}")
     return full_trial_results
 
 def fit_pl(train, test, mc, say):
@@ -114,7 +155,12 @@ def fit_pl(train, test, mc, say):
         say(f"  [2/3] Starting to learn Plackett-Luce model. This may take a while for {len(train[0])} items ...")
     else:
         say(f"  [2/3] Starting to learn Plackett-Luce model.")
-    util, _ = learn_PL(train - 1, test - 1)
+    
+    # Convert lists to numpy arrays if needed
+    train_array = np.array(train) if not isinstance(train, np.ndarray) else train
+    test_array = np.array(test) if not isinstance(test, np.ndarray) else test
+    
+    util, _ = learn_PL(train_array - 1, test_array - 1)
     say(f"        Plackett-Luce is learned.")
     say(f"        Testing the PL model with {mc} samples...")
     # testing the model ...
@@ -122,6 +168,27 @@ def fit_pl(train, test, mc, say):
     evals = evaluate_metrics(test, samples)
     full_trial_results = {"utilities": util, **pack(*evals, suffix="_PL")}
     say(f"             top-1 hit rate: {full_trial_results['top_k_hit_rates_PL'][0]:.4f}")
+    return full_trial_results
+
+
+def fit_pl_reg(train, test, mc, say):
+    if len(train[0]) > 20: 
+        say(f"  [2/3] Starting to learn Regularized Plackett-Luce model. This may take a while for {len(train[0])} items ...")
+    else:
+        say(f"  [2/3] Starting to learn Regularized Plackett-Luce model.")
+    
+    # Convert lists to numpy arrays if needed
+    train_array = np.array(train) if not isinstance(train, np.ndarray) else train
+    test_array = np.array(test) if not isinstance(test, np.ndarray) else test
+    
+    util, _ = learn_PL(train_array - 1, test_array - 1, lambda_reg=0.01)
+    say(f"        Regularized Plackett-Luce is learned.")
+    say(f"        Testing the regularized PL model with {mc} samples...")
+    # testing the model ...
+    samples = sample_PL(util, n_samples=mc)
+    evals = evaluate_metrics(test, samples)
+    full_trial_results = {"utilities_reg": util, **pack(*evals, suffix="_PL_reg")}
+    say(f"             top-1 hit rate: {full_trial_results['top_k_hit_rates_PL_reg'][0]:.4f}")
     return full_trial_results
 
 

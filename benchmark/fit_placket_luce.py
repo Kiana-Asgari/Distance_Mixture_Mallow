@@ -1,16 +1,26 @@
 import numpy as np
 from scipy.optimize import minimize
+from typing import Optional
 
 
 # ----------------------------------------------------------------------
 #  High-level helper
 # ----------------------------------------------------------------------
-def learn_PL(permutations_train, permutations_test):
+def learn_PL(permutations_train, permutations_test, lambda_reg: float = 0):
     """
     Fit a Plackett–Luce model and return (utilities , normalised-NLL on test set).
+    
+    Parameters
+    ----------
+    permutations_train : np.ndarray
+        Training permutations
+    permutations_test : np.ndarray
+        Test permutations
+    lambda_reg : float, default=0.01
+        Ridge regularization parameter
     """
     model = PlackettLuceModel(permutations_train)
-    est_utils = model.fit()
+    est_utils = model.fit(lambda_reg=lambda_reg)
     nll = model.compute_normalized_nll(permutations_test, est_utils)
     return est_utils, nll
 
@@ -32,14 +42,15 @@ class PlackettLuceModel:
         self.n_items  = rankings.shape[1]
 
 
-    def negative_log_likelihood(self, params: np.ndarray) -> float:
+    def negative_log_likelihood(self, params: np.ndarray, lambda_reg: float = 0.01) -> float:
         """
         Vectorised implementation of
 
             L(θ) = − Σ_r Σ_{m=0}^{n−2} log  exp(θ_{π_r[m]}) /
                                                 Σ_{j≥m} exp(θ_{π_r[j]})
+                    + λ/2 * ||θ||²
 
-        where π_r is ranking r.
+        where π_r is ranking r and λ is the ridge regularization parameter.
         """
         exp_theta   = np.exp(params)                   # (n_items,)
         exp_utils   = exp_theta[self.rankings]         # (R , n)
@@ -53,18 +64,25 @@ class PlackettLuceModel:
         denom       = denom[:, :-1]
 
         nll_matrix  = np.log(denom) - np.log(numer)    # (R , n−1)
-        return nll_matrix.sum()                       # scalar
+        
+        # Add ridge regularization term
+        ridge_term = 0.5 * lambda_reg * np.sum(params**2)
+        
+        return nll_matrix.sum() + ridge_term       # scalar
 
     # -----------------------------
     #  MLE fit
     # -----------------------------
-    def fit(self, initial_guess: np.ndarray | None = None) -> np.ndarray:
+    def fit(self, initial_guess: Optional[np.ndarray] = None, lambda_reg: float = 0.01) -> np.ndarray:
         if initial_guess is None:
             initial_guess = np.zeros(self.n_items)
 
+        # Create a wrapper function that passes the regularization parameter
+        def objective(params):
+            return self.negative_log_likelihood(params, lambda_reg)
 
         res = minimize(
-            self.negative_log_likelihood,
+            objective,
             initial_guess,
             method='L-BFGS-B',
             options={'maxiter': 1000, 'disp': False}

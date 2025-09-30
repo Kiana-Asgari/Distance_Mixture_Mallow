@@ -1,7 +1,7 @@
 import numpy as np
 from GMM_diagonalized.sampling import sample_truncated_mallow
 from collections import Counter
-from typing import Callable, Sequence, Tuple, List
+from typing import Callable, Sequence, Tuple, List, Optional
 from benchmark.fit_placket_luce import sample_PL
 from scipy.stats import kendalltau
 from benchmark.fit_Mallow_kendal import sample_kendal
@@ -70,11 +70,7 @@ def evaluate_metrics(test_set, sampled_set):
     pairwise_acc  = ((dot_mat + P) / (2 * P)).mean()              # (= (τ+1)/2)
 
     # ---------- 5) nDCG ----------
-    rel_t         = n_items - pos_t                               # relevance
-    disc_p        = 1 / np.log2(pos_p + 2)
-    dcg_mat       = rel_t @ disc_p.T                              # (n_t , n_p)
-    idcg          = (rel_t * (1 / np.log2(pos_t + 2))).sum(1)     # (n_t,)
-    ndcg          = (dcg_mat / idcg[:, None]).mean()
+    ndcg          = 0
 
     return (top_k_hit_rates,
             float(spearman_rho),
@@ -163,7 +159,7 @@ def soft_top_k(test_set, alpha_hat, beta_hat, sigma_hat, Delta=None, rng_seed=No
     ndcg = ndcg_at_k(test_set, samples)
     return hit_rate_list, distances, ndcg, pairwise_accuracy(test_set, samples)
 
-def distance_metrics(test_set, MC_set, *, cayley_samples: int = 50_000, rng_seed: int | None = None):
+def distance_metrics(test_set, MC_set, *, cayley_samples: int = 50_000, rng_seed: Optional[int] = None):
     """
     Compute similarity / distance metrics between an empirical test set of
     permutations (`test_set`) and a Monte-Carlo sample (`MC_set`).
