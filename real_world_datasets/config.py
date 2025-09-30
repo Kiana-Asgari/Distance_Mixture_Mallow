@@ -45,9 +45,9 @@ FILES = {
 
 
 
-MODEL_LABEL     = {'Original L1': 'ML', 'Plackett-Luce': 'PL', 'Kendall': 'kendal'}
-MODEL_NICE_NAME = {'Original L1': 'L_α-Mallows', 'Plackett-Luce': 'Plackett–Luce',
-                'Kendall': "Mallows τ"}
+MODEL_LABEL     = {'Original L1': 'ML', 'Mallows Footrule': 'footrule', 'Mallows Spearman': 'spearman', 'Plackett-Luce': 'PL', 'Plackett-Luce-Reg': 'PL_reg', 'Kendall': 'kendal'}
+MODEL_NICE_NAME = {'Original L1': 'L_α-Mallows', 'Mallows Footrule': 'L₁-Mallows', 'Mallows Spearman': 'L₂-Mallows', 'Plackett-Luce': 'Plackett–Luce',
+                'Plackett-Luce-Reg': 'Plackett–Luce (Ridge)', 'Kendall': "Mallows τ"}
 
 METRICS_NICE_NAMES = {                       # key-template,   ↑/↓ label,  display-factor
     'spearman_rho':  ('spearman_rho_{}',   "↑ Spearman's ρ",    1),
@@ -62,5 +62,6 @@ METRIC_NAMES = (
     "spearman_rho",
     "hamming_distance",
     "kendall_tau",
+    "ndcg",
     "pairwise_acc",
 )

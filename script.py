@@ -1,4 +1,5 @@
 import numpy as np
+import sys 
 import argparse
 from real_world_datasets.fit_models import fit_models
 from real_world_datasets.print_evaluations import read_and_print_results
@@ -15,14 +16,14 @@ def parse_arguments():
     
     # Fit models subparser
     fit_real_world_parser = subparsers.add_parser('fit-real-world', help='Fit models to dataset')
-    fit_real_world_parser.add_argument('--dataset', type=str, default='sushi', 
-                           help='Dataset name (default: sushi)')
+    fit_real_world_parser.add_argument('--dataset', type=str, default='movie_lens', 
+                           help='Dataset name (default: movie_lens)')
     fit_real_world_parser.add_argument('--n-teams', type=int, default=100,
                            help='Number of teams (default: 100)')
     fit_real_world_parser.add_argument('--truncation', type=int, choices=[5,6,7], default=7,
                            help='Truncation parameter (default: 7, choices: 5-7)')
-    fit_real_world_parser.add_argument('--mc-samples', type=int, default=100,
-                           help='Number of Monte Carlo samples (default: 100)')
+    fit_real_world_parser.add_argument('--mc-samples', type=int, default=300,
+                           help='Number of Monte Carlo samples (default: 300)')
     fit_real_world_parser.add_argument('--seed', type=int, default=42,
                            help='Random seed (default: 42)')
     fit_real_world_parser.add_argument('--n-trials', type=int, default=1,
@@ -31,6 +32,8 @@ def parse_arguments():
                            help='Save results (default: False)')
     fit_real_world_parser.add_argument('--verbose', action='store_true', default=True,
                            help='Verbose output (default: True)')
+    fit_real_world_parser.add_argument('--n-movies', type=int, default=10,
+                           help='Number of movies (default: 10)')
     
     # Synthetic data subparser
     fit_synthetic_parser = subparsers.add_parser('fit-synthetic', help='Fit models to synthetic data')    
@@ -55,7 +58,10 @@ def parse_arguments():
     return parser.parse_args()
 
 if __name__ == "__main__":
+    from real_world_datasets.movie_lens.load_MovieLens import load_and_return_ratings_movies
+
     args = parse_arguments()
+
 
     if args.mode == 'fit-synthetic':
         learn_synthetic_data(n=args.n_items,
@@ -70,8 +76,11 @@ if __name__ == "__main__":
 
     
     elif args.mode == 'fit-real-world':
+
         if args.dataset == 'sushi':
             args.n_teams = 10
+        elif args.dataset == 'movie_lens':
+            args.n_teams = args.n_movies
 
         fit_models(dataset_name=args.dataset,
                    n_teams=args.n_teams,

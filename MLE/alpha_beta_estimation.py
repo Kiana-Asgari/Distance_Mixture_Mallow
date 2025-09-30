@@ -13,14 +13,19 @@ def solve_alpha_beta(pis, sigma, Delta,
                      popsize     = 150,       # Increased from 50
                      mutation    = (0.1, 0.5), # Wider range for better exploration
                      recombination = 0.9,
-                     tol         = 1e-2,      # Decreased from 5*1e-1 for higher accuracy
+                     tol         = 1e-4,      # Decreased from 5*1e-1 for higher accuracy
                      rng_seed    = None,
+                     fixed_alpha = False,
+                     fixed_alpha_value = 1,
                      ord         = 1/2):  # Added finish_method parameter
 
     """
     Zeroth-order search for (α̂, β̂) such that Ψ_m(α̂,β̂;σ)=0.
     np.ndarray([α̂, β̂])
     """
+    print('fixed_alpha', fixed_alpha)
+    if fixed_alpha:
+        alpha_bounds = (fixed_alpha_value-1e-3, fixed_alpha_value+1e-3)
     bounds = [alpha_bounds, beta_bounds]
     max_workers = 4
 
@@ -43,6 +48,8 @@ def solve_alpha_beta(pis, sigma, Delta,
     )
 
     α_hat, β_hat = res.x  
+    #if fixed_alpha:
+   #     α_hat = 1
     # α_hat, β_hat = find_root_from_approx(pis, sigma, np.array([α_hat, β_hat]))
     return np.array([α_hat, β_hat])
 

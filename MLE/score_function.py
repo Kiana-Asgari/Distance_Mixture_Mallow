@@ -7,8 +7,7 @@ from scipy.interpolate import RectBivariateSpline
 def psi_m_wrapper(x, pis, sigma, Delta, ord=1/2): 
     lookup_data = load_lookup_tables(len(sigma), Delta=Delta)
     psi = psi_m(pis, sigma, x[0], x[1], lookup_data)
-    psi[1] /= np.log(len(sigma))  # Normalize the second component for more robust optimization
-
+    #psi[1] /= np.log(len(sigma))  # Normalize the second component for more robust optimization
     return np.linalg.norm(psi, ord=ord)  # Return the L1/2 norm of the score
                                          # function for more robust optimization
                                          # when using differential evolution
