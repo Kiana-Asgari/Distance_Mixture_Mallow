@@ -72,12 +72,14 @@ def evaluate_metrics(test_set, sampled_set):
     # ---------- 5) nDCG ----------
     ndcg          = 0
 
-    return (top_k_hit_rates,
-            float(spearman_rho),
-            float(hamming_distance),
-            float(kendall_tau),
-            float(ndcg),
-            float(pairwise_acc))
+    return {'@top_1': top_k_hit_rates[0],
+            '@top_5': top_k_hit_rates[4],
+            #'top_10_hit_rates': top_k_hit_rates[9],
+            'rho': float(spearman_rho),
+            #'hamming_distance': float(hamming_distance),
+            'tau': float(kendall_tau),
+            #'ndcg': float(ndcg),
+            'pairwise_acc': float(pairwise_acc)}
 
 
 

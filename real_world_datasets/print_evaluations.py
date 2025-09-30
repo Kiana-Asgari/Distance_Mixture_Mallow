@@ -1,9 +1,38 @@
 import json
 from real_world_datasets.utils import make_table
+import pandas as pd
+import numpy as np
 
+def print_online_results(results: dict):
+    print(results)
 
-def print_online_results(results):
-    make_table(results)
+    all_model_names = list(results.keys())
+    all_metric_names = list(results[all_model_names[0]][0]['evals'].keys())
+    columns = ['Model', 'alpha', 'beta'] + list(all_metric_names)
+    final_table = pd.DataFrame(columns=columns)
+
+    for model_name in all_model_names:
+        model_results = results[model_name]
+        
+        # Extract all values for this model
+        alpha_values = [trial['args'].get('alpha', 0) for trial in model_results]
+        beta_values = [trial['args'].get('beta', 0) for trial in model_results]
+        metric_values = {metric: [trial['evals'][metric] for trial in model_results] 
+                        for metric in all_metric_names}
+        
+        
+        # Create row data
+        row_data = {
+            'Model': model_name,
+            'alpha': _format_param(alpha_values),
+            'beta': _format_param(beta_values),
+            **{metric: _format_stat(values) for metric, values in metric_values.items()}
+        }
+        
+        final_table = pd.concat([final_table, pd.DataFrame([row_data])], ignore_index=True)
+
+    print(final_table)
+
 
 
 def read_and_print_results(n_items=100, dataset_name='basketball'):
@@ -15,6 +44,16 @@ def read_and_print_results(n_items=100, dataset_name='basketball'):
         results = json.load(f)
     make_table(results)
 
+
+# Calculate statistics
+def _format_stat(values):
+    mean_val = np.mean(values)
+    se_val = np.std(values) / np.sqrt(len(values))
+    return f"{mean_val:.2f} (± {se_val:.1f})"
+
+def _format_param(values):
+    mean_val = np.mean(values)
+    return _format_stat(values) if mean_val != 0 else '--'
 
 
 

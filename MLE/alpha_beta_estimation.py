@@ -6,14 +6,14 @@ from MLE.score_function import psi_m_wrapper
 
 
 def solve_alpha_beta(pis, sigma, Delta,
-                     alpha_bounds=(1e-4, 2),
-                     beta_bounds =(1e-4, 2),
+                     alpha_bounds=(1e-3, 2),
+                     beta_bounds =(1e-3, 2),
                      *,
                      maxiter     = 300,       # Increased from 100
                      popsize     = 150,       # Increased from 50
                      mutation    = (0.1, 0.5), # Wider range for better exploration
                      recombination = 0.9,
-                     tol         = 1e-4,      # Decreased from 5*1e-1 for higher accuracy
+                     tol         = 1e-5,      # Decreased from 5*1e-1 for higher accuracy
                      rng_seed    = None,
                      fixed_alpha = False,
                      fixed_alpha_value = 1,
@@ -27,7 +27,8 @@ def solve_alpha_beta(pis, sigma, Delta,
     if fixed_alpha:
         alpha_bounds = (fixed_alpha_value-1e-3, fixed_alpha_value+1e-3)
     bounds = [alpha_bounds, beta_bounds]
-    max_workers = 4
+    max_workers = 5
+    tol = 1e-5
 
     res = differential_evolution(
         psi_m_wrapper,
@@ -40,7 +41,7 @@ def solve_alpha_beta(pis, sigma, Delta,
         popsize       = popsize,
         mutation      = mutation,
         recombination = recombination,
-        polish        = False,
+        polish        = True,
         updating      = "deferred",
         workers       = max_workers,
         init          = 'latinhypercube',  # Better initial population sampling

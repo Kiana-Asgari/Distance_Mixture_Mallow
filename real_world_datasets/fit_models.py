@@ -32,21 +32,8 @@ from real_world_datasets.config import METRIC_NAMES
 # fitting models (Mallows, Plackett-Luce, Kendall)
 # on real-world datasets (college sports, sushi)
 #####################################################
-
-def fit_models(
-    dataset_name: str = "basketball",
-    Delta: int = 7,
-    seed: int = 42,
-    n_trials: int = 50,
-    n_teams: int = 10,
-    mc_samples: int = 10_000,
-    save: bool = False,
-    verbose: bool = True
-    ):
-
-
-    
-    say = print if verbose else (lambda *_, **__: None) # print if verbose else do nothing
+def _get_data(dataset_name, n_teams):
+        
     if dataset_name == 'sushi':
         data = load_sushi()
     elif dataset_name == 'movie_lens':
@@ -56,78 +43,110 @@ def fit_models(
     else:
         data = load_data(dataset_name=dataset_name, n_teams_to_keep=n_teams)
         print('first ranking:', data[0])
+    return data
 
+def _read_results(dataset_name, n_teams, save):    
     res_path = Path(f"real_world_datasets/results/{dataset_name}_n_teams={n_teams}.json")
     res_path.parent.mkdir(parents=True, exist_ok=True) # create the directory if it doesn't exist
     if save==True:
         results = json.loads(res_path.read_text()) if res_path.exists() else []
     else:
         results = []
+    return results, res_path
 
-    for t in range(len(results), n_trials):
+def _save_results(results, res_path, save, say):
+    if save:
+        res_path.write_text(json.dumps(convert_numpy_to_native(results), indent=2))
+        say("  ⭑ intermediate results saved")
+        say(f"Final results → {res_path}")
+
+def fit_models( dataset_name: str = "basketball",
+                Delta: int = 7,
+                seed: int = 42,
+                n_trials: int = 50,
+                n_teams: int = 10,
+                mc_samples: int = 10_000,
+                save: bool = False,
+                verbose: bool = True
+                ):
+    mc_samples = 500
+    # print if verbose else do nothing
+    say = print if verbose else (lambda *_, **__: None) 
+    # get the data 
+    data = _get_data(dataset_name, n_teams)
+    # get the results if they exist; else create an empty list
+    results, res_path = _read_results(dataset_name, n_teams, save) 
+    # fit the models using MCCV random splits
+    results = _mote_carlo_CV(data, results, n_trials, n_teams, mc_samples, Delta, seed, say, save, dataset_name, res_path)
+    # save the results
+    _save_results(results, res_path, save, say)
+
+    say(f"\nCompleted {len(results)} trials")
+    # print the table of comparison
+    print_online_results(results)
+
+
+
+
+
+
+def _mote_carlo_CV(data, results, n_trials, n_teams, mc_samples, Delta, seed, say, save, dataset_name, res_path):
+    """Main loop of the MCCV random splits"""
+
+    for t in range(len(results), n_trials):      
         say(f"Trial {t + 1}/{n_trials}")
-        if dataset_name == 'movie_lens' or dataset_name == 'news':
+
+        # if news or movies, perform a random split; else perform a chronologically split
+        if dataset_name in ['movie_lens', 'news', 'sushi']:
             train, test, *_ = train_split(data, 0.8, seed + t)
         else:
              train, test, *_ = chronologically_train_split(data, seed + t)
-        # Handle both numpy arrays and lists for shape reporting
-        train_shape = train.shape if hasattr(train, 'shape') else f"list({len(train)})"
-        test_shape = test.shape if hasattr(test, 'shape') else f"list({len(test)})"
-        say(f"  train and test data shape: {train_shape}, {test_shape}")
-        trial = {
-            "full_data_size": len(data),
-            "train_size": len(train),
-            "test_size": len(test),
-        }
+        train, test = np.array(train), np.array(test)
 
-        # Mallows (L-α)
-        mallows = fit_mallows(train, test, n_teams, mc_samples, Delta, say, alpha_fixed=False)
-        trial.update(mallows)
 
-        # Mallows Footrule (L₁)
-        footrule = fit_mallows(train, test, n_teams, mc_samples, Delta, say, alpha_fixed=True)
-        trial.update(footrule)
-
-        # Mallows Spearman's ρ (α=2)
-        spearman = fit_mallows(train, test, n_teams, mc_samples, Delta, say, alpha_fixed=True, alpha_fixed_value=2)
-        trial.update(spearman)
+        # create a trial dictionary
+        benchmark_models_names = ['our', 'L1', 'L2', 'tau', 'pl', 'pl_reg']
+        trial = {model_name: [] for model_name in benchmark_models_names}
+        # create a zip of benchmark models
+        for model_name in benchmark_models_names:
+            res_evals, args = _fit_benchmark_models(model_name, train, test, n_teams, mc_samples, Delta, say)
+            trial[model_name].append({'evals': res_evals, 'args': args})
         
-        # Plackett–Luce
-        PL = fit_pl(train, test, mc_samples, say)
-        trial.update(PL)
+        results=trial.copy() # TODO: not reading from results
 
-        # Regularized Plackett–Luce
-        PL_reg = fit_pl_reg(train, test, mc_samples, say)
-        trial.update(PL_reg)
+    return results
 
-        # Kendall
-        kendall = fit_kendall(train, test, mc_samples, say)
-        trial.update(kendall)
 
-        results.append(trial)
-        if save:
-            res_path.write_text(json.dumps(convert_numpy_to_native(results), indent=2))
-            say("  ⭑ intermediate results saved")
 
-    say(f"\nCompleted {len(results)} trials")
-    say(f"   L-α Mallows chose the following central ranking: {results[0]['sigma_0']}")
-    say(f"   Kendal chose the following central ranking: {1+results[0]['sigma_0_kendal']}")
-    print_online_results(results)
-    if save:
-        say(f"Final results → {res_path}")
+def _fit_benchmark_models(model_name, train, test, n_teams, mc_samples, Delta, say):
 
+    if model_name == 'our':
+        samples, args = fit_mallows(train, test, n_teams, mc_samples, Delta, say)
+    elif model_name == 'L1':
+        samples, args = fit_mallows(train, test, n_teams, mc_samples, Delta, say, alpha_fixed=True)
+    elif model_name == 'L2':
+        samples, args = fit_mallows(train, test, n_teams, mc_samples, Delta, say, alpha_fixed=True, alpha_fixed_value=2)
+    elif model_name == 'pl':
+        samples, args = fit_pl(train, test, n_teams, mc_samples, Delta, say)
+    elif model_name == 'pl_reg':
+        samples, args = fit_pl_reg(train, test, n_teams, mc_samples, Delta, say)
+    elif model_name == 'tau':
+        samples, args = fit_kendall(train, test, n_teams, mc_samples, Delta, say)
+    else:
+        raise ValueError(f"Model {model_name} not found")
+    evals = evaluate_metrics(test, samples)
+
+    return evals, args
 
 
 
 def fit_mallows(train, test, k, mc, delta, say, alpha_fixed=False, alpha_fixed_value=1):
-    if len(train[0]) > 20:
-        say(f"  [1/3] Starting to learn L-α Mallows model. This may take a while for {len(train[0])} items ...")
-    else:
-        say(f"  [1/3] Starting to learn L-α Mallows model.")
+
+    say(f"  Starting to learn Mallows model for {len(train[0])} items ...")
     sigma_0 = consensus_ranking_estimation(train)
     alpha, beta = solve_alpha_beta(train, sigma_0, Delta=delta, fixed_alpha=alpha_fixed, fixed_alpha_value=alpha_fixed_value)
 
-    say(f"        L-α Mallows is learned with alpha: {alpha:.4f}, beta: {beta:.4f}")
+    say(f"        Mallows is learned with alpha: {alpha:.4f}, beta: {beta:.4f}")
     say(f"        testing the Mallows model with {mc} samples...")
     # testing the model ...
     if len(train[0]) > 20:
@@ -135,77 +154,48 @@ def fit_mallows(train, test, k, mc, delta, say, alpha_fixed=False, alpha_fixed_v
     else:
         Delta_mc = 7
     samples = sample_truncated_mallow(n=k, alpha=alpha, beta=beta, sigma=sigma_0, Delta=Delta_mc, num_samples=mc)
-    evals = evaluate_metrics(test, samples)
-    if alpha_fixed:
-        if alpha_fixed_value == 2:  # Spearman's ρ model
-            suffix = "_spearman"
-            full_trial_results = {"sigma_0_spearman": sigma_0, "alpha_spearman": alpha, "beta_spearman": beta, **pack(*evals, suffix=suffix)}
-            say(f"        Spearman's ρ model (α=2) learned with beta: {beta:.4f}")
-        else:  # Footrule model
-            suffix = "_footrule"
-            full_trial_results = {"sigma_0_footrule": sigma_0, "alpha_footrule": alpha, "beta_footrule": beta, **pack(*evals, suffix=suffix)}
-    else:
-        suffix = "_ML"
-        full_trial_results = {"sigma_0": sigma_0, "alpha": alpha, "beta": beta, **pack(*evals, suffix=suffix)}
-    say(f"             top-1 hit rate: {full_trial_results[f'top_k_hit_rates{suffix}'][0]:.4f}")
-    return full_trial_results
+    args = {
+        "sigma_0": sigma_0,
+        "alpha": alpha,
+        "beta": beta,
+    }
+    return samples, args
 
-def fit_pl(train, test, mc, say):
-    if len(train[0]) > 20: 
-        say(f"  [2/3] Starting to learn Plackett-Luce model. This may take a while for {len(train[0])} items ...")
-    else:
-        say(f"  [2/3] Starting to learn Plackett-Luce model.")
+
+def fit_pl(train, test, n_teams, mc_samples, Delta, say, alpha_fixed=None, alpha_fixed_value=None):
+    say(f"  Starting to learn Plackett-Luce model for {len(train[0])} items ...")
     
-    # Convert lists to numpy arrays if needed
-    train_array = np.array(train) if not isinstance(train, np.ndarray) else train
-    test_array = np.array(test) if not isinstance(test, np.ndarray) else test
     
-    util, _ = learn_PL(train_array - 1, test_array - 1)
+    util, _ = learn_PL(train - 1, test- 1)
     say(f"        Plackett-Luce is learned.")
-    say(f"        Testing the PL model with {mc} samples...")
+    say(f"        Testing the PL model with {mc_samples} samples...")
     # testing the model ...
-    samples = sample_PL(util, n_samples=mc)
-    evals = evaluate_metrics(test, samples)
-    full_trial_results = {"utilities": util, **pack(*evals, suffix="_PL")}
-    say(f"             top-1 hit rate: {full_trial_results['top_k_hit_rates_PL'][0]:.4f}")
-    return full_trial_results
+    samples = sample_PL(util, n_samples=mc_samples)
+    args={"util": util}
+    return samples, args
 
 
-def fit_pl_reg(train, test, mc, say):
-    if len(train[0]) > 20: 
-        say(f"  [2/3] Starting to learn Regularized Plackett-Luce model. This may take a while for {len(train[0])} items ...")
-    else:
-        say(f"  [2/3] Starting to learn Regularized Plackett-Luce model.")
-    
-    # Convert lists to numpy arrays if needed
-    train_array = np.array(train) if not isinstance(train, np.ndarray) else train
-    test_array = np.array(test) if not isinstance(test, np.ndarray) else test
-    
-    util, _ = learn_PL(train_array - 1, test_array - 1, lambda_reg=0.01)
+def fit_pl_reg(train, test, n_teams, mc_samples, Delta, say, alpha_fixed=None, alpha_fixed_value=None):
+    say(f"  Starting to learn Regularized Plackett-Luce model for {len(train[0])} items ...")
+    lambda_reg = 0.01
+    util, _ = learn_PL(train - 1, test- 1, lambda_reg=lambda_reg)
     say(f"        Regularized Plackett-Luce is learned.")
-    say(f"        Testing the regularized PL model with {mc} samples...")
+    say(f"        Testing the regularized PL model with {mc_samples} samples...")
     # testing the model ...
-    samples = sample_PL(util, n_samples=mc)
-    evals = evaluate_metrics(test, samples)
-    full_trial_results = {"utilities_reg": util, **pack(*evals, suffix="_PL_reg")}
-    say(f"             top-1 hit rate: {full_trial_results['top_k_hit_rates_PL_reg'][0]:.4f}")
-    return full_trial_results
+    args={"util": util, "lambda_reg": lambda_reg}
+    samples = sample_PL(util, n_samples=mc_samples)
+    return samples, args
 
 
-def fit_kendall(train, test, mc, say): 
-    if len(train[0]) > 20:
-        say(f"  [3/3] Starting to learn Kendall model. This may take a while for {len(train[0])} items ...")
-    else:
-        say(f"  [3/3] Starting to learn Kendall model.")
+def fit_kendall(train, test, n_teams, mc_samples, Delta, say, alpha_fixed=None, alpha_fixed_value=None):
+    say(f"  Starting to learn Kendall model for {len(train[0])} items ...")
     sigma_0, theta, _ = learn_kendal(train - 1, test - 1)
     say(f"        Kendall is learned with theta: {theta:.4f}.")
-    say(f"        testing the Kendall model with {mc} samples...")
+    say(f"        testing the Kendall model with {mc_samples} samples...")
     # testing the model ...
-    samples = sample_kendal(sigma_0=sigma_0, theta=theta, num_samples=mc)
-    evals = evaluate_metrics(test, samples)
-    full_trial_results = {**pack(*evals, suffix="_kendal"), "sigma_0_kendal": sigma_0, "theta_kendal": theta}
-    say(f"             top-1 hit rate: {full_trial_results['top_k_hit_rates_kendal'][0]:.4f}")
-    return full_trial_results
+    samples = sample_kendal(sigma_0=sigma_0, theta=theta, num_samples=mc_samples)
+    args={"sigma_0": sigma_0, "theta": theta}
+    return samples, args
 
 def pack(*vals, suffix=""):            # names metrics[0] → f"{prefix}metric_name"
     return {f"{n}{suffix}": v for n, v in zip(METRIC_NAMES, vals)}
