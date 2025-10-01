@@ -24,9 +24,9 @@ def print_online_results(results: dict):
         # Create row data
         row_data = {
             'Model': model_name,
-            'alpha': _format_param(alpha_values),
-            'beta': _format_param(beta_values),
-            **{metric: _format_stat(values) for metric, values in metric_values.items()}
+            'alpha': _format_param(alpha_values, is_arg=True),
+            'beta': _format_param(beta_values, is_arg=True),
+            **{metric: _format_stat(values, is_arg=False) for metric, values in metric_values.items()}
         }
         
         final_table = pd.concat([final_table, pd.DataFrame([row_data])], ignore_index=True)
@@ -46,14 +46,19 @@ def read_and_print_results(n_items=100, dataset_name='basketball'):
 
 
 # Calculate statistics
-def _format_stat(values):
-    mean_val = np.mean(values)
-    se_val = np.std(values) / np.sqrt(len(values))
-    return f"{mean_val:.2f} (± {se_val:.1f})"
+def _format_stat(values, is_arg: bool = False):
+    if is_arg:
+        mean_val = np.mean(values)
+        se_val = np.std(values) / np.sqrt(len(values))
+        return f"{mean_val:.2f}(± {se_val:.1f})"
+    else:
+        mean_val = np.mean(values) * 100
+        se_val = np.std(values) / np.sqrt(len(values)) * 100
+        return f"{mean_val:.0f} (± {se_val:.0f})"
 
-def _format_param(values):
+def _format_param(values, is_arg: bool = False):
     mean_val = np.mean(values)
-    return _format_stat(values) if mean_val != 0 else '--'
+    return _format_stat(values, is_arg) if mean_val != 0 else '--'
 
 
 

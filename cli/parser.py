@@ -27,7 +27,7 @@ def add_real_world_arguments(parser):
                        help='Number of teams (default: 100)')
     parser.add_argument('--truncation', type=int, choices=[5, 6, 7], default=7,
                        help='Truncation parameter (default: 7, choices: 5-7)')
-    parser.add_argument('--mc-samples', type=int, default=500,
+    parser.add_argument('--mc-samples', type=int, default=300,
                        help='Number of Monte Carlo samples (default: 500)')
     parser.add_argument('--seed', type=int, default=42,
                        help='Random seed (default: 42)')

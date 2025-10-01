@@ -128,7 +128,7 @@ def make_table(trials):
 
 def _col(values, scale=1):
     """mean ± std, optionally scaled (e.g. to %)"""
-    return f"{np.mean(values)*scale:.3f} (± {np.std(values)*scale:.3f})"
+    return f"{100*np.mean(values)*scale:.1f} (± {100*np.std(values)*scale:.1f})"
 
 
 def _fetch(trials, key):

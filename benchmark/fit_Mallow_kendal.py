@@ -1,6 +1,7 @@
 import numpy as np
 from scipy.optimize import minimize
 from scipy.stats import kendalltau
+from typing import Literal
 
 def kendall_tau_distance(rank1, rank2):
     n = len(rank1)
@@ -28,7 +29,7 @@ def negative_log_likelihood(theta, rankings, pi_0):
     total_distance = sum(kendall_tau_distance(pi, pi_0) for pi in rankings)
     return theta * total_distance + len(rankings) * np.log(z_theta(theta, n))
 
-def learn_kendal(permutations_train, permutations_test):
+def learn_kendal(permutations_train, permutations_test, weights:Literal[None, 'linear', 'log'] = None):
     pi_0 = borda_count(permutations_train)
     result = minimize(negative_log_likelihood, x0=1.0, args=(permutations_train, pi_0), bounds=[(0.01, None)])
     theta_hat = result.x[0]

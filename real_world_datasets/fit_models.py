@@ -69,7 +69,6 @@ def fit_models( dataset_name: str = "basketball",
                 save: bool = False,
                 verbose: bool = True
                 ):
-    mc_samples = 500
     # print if verbose else do nothing
     say = print if verbose else (lambda *_, **__: None) 
     # get the data 
@@ -105,7 +104,7 @@ def _mote_carlo_CV(data, results, n_trials, n_teams, mc_samples, Delta, seed, sa
 
 
         # create a trial dictionary
-        benchmark_models_names = ['our', 'L1', 'L2', 'tau', 'pl', 'pl_reg']
+        benchmark_models_names = ['our', 'L1', 'L2']#, 'tau', 'pl', 'BT', 'pl_reg'] #['our', 'L1', 'L2', 'tau', 'pl', 'pl_reg']
         trial = {model_name: [] for model_name in benchmark_models_names}
         # create a zip of benchmark models
         for model_name in benchmark_models_names:
@@ -127,9 +126,11 @@ def _fit_benchmark_models(model_name, train, test, n_teams, mc_samples, Delta, s
     elif model_name == 'L2':
         samples, args = fit_mallows(train, test, n_teams, mc_samples, Delta, say, alpha_fixed=True, alpha_fixed_value=2)
     elif model_name == 'pl':
-        samples, args = fit_pl(train, test, n_teams, mc_samples, Delta, say)
+        samples, args = fit_pl(train, test, n_teams, mc_samples, Delta, say, BL_model=False)
     elif model_name == 'pl_reg':
-        samples, args = fit_pl_reg(train, test, n_teams, mc_samples, Delta, say)
+        samples, args = fit_pl_reg(train, test, n_teams, mc_samples, Delta, say, BL_model=False)
+    elif model_name == 'BT':
+        samples, args = fit_pl(train, test, n_teams, mc_samples, Delta, say, BL_model=True)
     elif model_name == 'tau':
         samples, args = fit_kendall(train, test, n_teams, mc_samples, Delta, say)
     else:
@@ -143,16 +144,13 @@ def _fit_benchmark_models(model_name, train, test, n_teams, mc_samples, Delta, s
 def fit_mallows(train, test, k, mc, delta, say, alpha_fixed=False, alpha_fixed_value=1):
 
     say(f"  Starting to learn Mallows model for {len(train[0])} items ...")
-    sigma_0 = consensus_ranking_estimation(train)
+    sigma_0 = consensus_ranking_estimation(train,alpha_fixed=alpha_fixed, alpha_fixed_value=alpha_fixed_value)
     alpha, beta = solve_alpha_beta(train, sigma_0, Delta=delta, fixed_alpha=alpha_fixed, fixed_alpha_value=alpha_fixed_value)
 
     say(f"        Mallows is learned with alpha: {alpha:.4f}, beta: {beta:.4f}")
     say(f"        testing the Mallows model with {mc} samples...")
     # testing the model ...
-    if len(train[0]) > 20:
-        Delta_mc = 5
-    else:
-        Delta_mc = 7
+    Delta_mc = 4
     samples = sample_truncated_mallow(n=k, alpha=alpha, beta=beta, sigma=sigma_0, Delta=Delta_mc, num_samples=mc)
     args = {
         "sigma_0": sigma_0,
@@ -162,11 +160,11 @@ def fit_mallows(train, test, k, mc, delta, say, alpha_fixed=False, alpha_fixed_v
     return samples, args
 
 
-def fit_pl(train, test, n_teams, mc_samples, Delta, say, alpha_fixed=None, alpha_fixed_value=None):
+def fit_pl(train, test, n_teams, mc_samples, Delta, say, alpha_fixed=None, alpha_fixed_value=None, BL_model=False):
     say(f"  Starting to learn Plackett-Luce model for {len(train[0])} items ...")
     
     
-    util, _ = learn_PL(train - 1, test- 1)
+    util, _ = learn_PL(train - 1, test- 1, BL_model=BL_model)
     say(f"        Plackett-Luce is learned.")
     say(f"        Testing the PL model with {mc_samples} samples...")
     # testing the model ...
@@ -175,15 +173,16 @@ def fit_pl(train, test, n_teams, mc_samples, Delta, say, alpha_fixed=None, alpha
     return samples, args
 
 
-def fit_pl_reg(train, test, n_teams, mc_samples, Delta, say, alpha_fixed=None, alpha_fixed_value=None):
+def fit_pl_reg(train, test, n_teams, mc_samples, Delta, say, alpha_fixed=None, alpha_fixed_value=None, BL_model=False):
     say(f"  Starting to learn Regularized Plackett-Luce model for {len(train[0])} items ...")
-    lambda_reg = 0.01
-    util, _ = learn_PL(train - 1, test- 1, lambda_reg=lambda_reg)
+    lambda_reg = 0.1
+    util, _ = learn_PL(train - 1, test- 1, lambda_reg=lambda_reg, BL_model=BL_model)
     say(f"        Regularized Plackett-Luce is learned.")
     say(f"        Testing the regularized PL model with {mc_samples} samples...")
     # testing the model ...
     args={"util": util, "lambda_reg": lambda_reg}
     samples = sample_PL(util, n_samples=mc_samples)
+
     return samples, args
 
 
