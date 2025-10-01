@@ -26,7 +26,7 @@ def generate_lookup_tables(n, Delta):
         return Z, E_d, E_dot_d
 
     # Parallel computation
-    results = Parallel(n_jobs=-1, verbose=10)(
+    results = Parallel(n_jobs=1, verbose=10)(
         delayed(compute_entry)(alpha, beta, n, Delta)
         for alpha in alpha_vals
         for beta in beta_vals
@@ -75,6 +75,6 @@ def generate_lookup_tables(n, Delta):
 if __name__ == "__main__":
     #generate_lookup_tables(5)
     # generate_lookup_tables(10)
-    for n in [ 10,20]:
-        for Delta in [1,2]:
+    for n in [ 100]:
+        for Delta in [5]:
             generate_lookup_tables(n=n, Delta=Delta)
