@@ -95,19 +95,19 @@ def grid_search(pis, sigma, Delta):
     for alpha in alpha_vals:
         bestbeta_for_alpha[alpha] = 0
         min_err = 100
-        for beta in beta_vals:
+        for i, beta in enumerate(beta_vals):
             psi_value = (psi_m(pis, sigma, alpha, beta, lookup_data))
             psi0_values[(alpha, beta)] = psi_value[0] 
             psi1_values[(alpha, beta)] = psi_value[1] 
-            if np.abs(psi_value[0]) < min_err:
+            if np.abs(psi_value[0]) <= min_err:
                 min_err = np.abs(psi_value[0])
-                bestbeta_for_alpha[alpha] = {'beta': beta, 'psi': psi_value}
+                bestbeta_for_alpha[alpha] = {'beta': beta_vals[i+1], 'psi': psi_value}
     min_err = 100
-    for alpha in alpha_vals:
+    for i, alpha in enumerate(alpha_vals):
         if np.abs(bestbeta_for_alpha[alpha]["psi"][1]) < min_err:
             min_err = np.abs(bestbeta_for_alpha[alpha]["psi"][1])
-            bestalpha_for_beta = alpha
+            bestalpha_for_beta = alpha_vals[i+1]
         print(f'alpha {alpha:2.2f}, beta {bestbeta_for_alpha[alpha]["beta"]:2.2f}, error {bestbeta_for_alpha[alpha]["psi"][1]:2.2f}')
     print(f'best alpha {bestalpha_for_beta:2.2f}, beta {bestbeta_for_alpha[bestalpha_for_beta]["beta"]:2.2f}, error {bestbeta_for_alpha[bestalpha_for_beta]["psi"]}')
 
-    return np.array([1, 1])
+    return np.array([bestalpha_for_beta, bestbeta_for_alpha[bestalpha_for_beta]["beta"]])
