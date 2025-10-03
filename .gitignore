@@ -116,4 +116,7 @@ dmypy.json
 .vscode/
 *.swp
 *.swo
-.DS_Store 
+.DS_Store
+
+# Project specific - MovieLens cache data
+real_world_datasets/movie_lens/cache/ 
