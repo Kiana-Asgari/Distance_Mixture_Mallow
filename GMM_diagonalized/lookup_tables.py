@@ -75,6 +75,6 @@ def generate_lookup_tables(n, Delta):
 if __name__ == "__main__":
     #generate_lookup_tables(5)
     # generate_lookup_tables(10)
-    for n in [ 100]:
-        for Delta in [5]:
+    for n in [ 50]:
+        for Delta in [8]:
             generate_lookup_tables(n=n, Delta=Delta)

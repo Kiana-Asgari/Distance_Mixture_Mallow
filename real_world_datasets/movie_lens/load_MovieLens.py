@@ -19,6 +19,7 @@ from typing import Union
 def download_movielens(version: str = "ml-25m", dest: Union[Path, str, None] = None) -> Path:
     """
     Download and unzip a MovieLens dataset. Returns the extraction directory.
+    Uses caching to avoid re-downloading or re-extracting if data already exists.
 
     Parameters
     ----------
@@ -26,7 +27,7 @@ def download_movielens(version: str = "ml-25m", dest: Union[Path, str, None] = N
         One of the official archives, e.g. "ml-25m", "ml-1m", "ml-latest-small".
     dest : Path | str | None
         Where to put the extracted files (directory will be created if necessary).
-        If None, uses a temporary directory.
+        If None, uses a cache directory in the current file's parent directory.
 
     Returns
     -------
@@ -34,21 +35,39 @@ def download_movielens(version: str = "ml-25m", dest: Union[Path, str, None] = N
         Directory containing ratings.csv (or ratings.dat) and movies.csv (or movies.dat).
     """
     base_url = f"https://files.grouplens.org/datasets/movielens/{version}.zip"
-    dest_dir = Path(dest or tempfile.mkdtemp()).expanduser().resolve()
+    
+    # Use a persistent cache directory instead of temporary directory
+    if dest is None:
+        cache_dir = Path(__file__).parent / "cache"
+        dest_dir = cache_dir
+    else:
+        dest_dir = Path(dest).expanduser().resolve()
+    
     dest_dir.mkdir(parents=True, exist_ok=True)
-
+    
+    extracted_dir = dest_dir / version
     zip_path = dest_dir / f"{version}.zip"
+    
+    # Check if already extracted
+    if extracted_dir.exists():
+        print(f"  ✔ Using cached data from {extracted_dir}")
+        return extracted_dir
+    
+    # Download zip if needed
     if not zip_path.exists():
         print(f"Downloading {version} … (~please wait)")
         urlretrieve(base_url, zip_path)
         print("  ✔ download finished")
-
+    else:
+        print(f"  ✔ Using cached zip file")
+    
+    # Extract
     print("Extracting …")
     with zipfile.ZipFile(zip_path, "r") as zf:
         zf.extractall(dest_dir)
-    print(f"  ✔ files available in {dest_dir / version}")
+    print(f"  ✔ files available in {extracted_dir}")
 
-    return dest_dir / version
+    return extracted_dir
 
 
 # -----------------------------------

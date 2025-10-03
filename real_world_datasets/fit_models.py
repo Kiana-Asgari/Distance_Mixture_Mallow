@@ -3,6 +3,7 @@ from pathlib import Path
 import json
 import numpy as np
 import sys
+import pandas as pd
 
 # ── data & utils ────────────────────────────────────────────────────────────────
 from real_world_datasets.college_sports.load_data import load_data
@@ -42,7 +43,6 @@ def _get_data(dataset_name, n_teams):
         data = load_news_data(n_items_to_keep=n_teams)
     else:
         data = load_data(dataset_name=dataset_name, n_teams_to_keep=n_teams)
-        print('first ranking:', data[0])
     return data
 
 def _read_results(dataset_name, n_teams, save):    
@@ -59,6 +59,11 @@ def _save_results(results, res_path, save, say):
         res_path.write_text(json.dumps(convert_numpy_to_native(results), indent=2))
         say("  ⭑ intermediate results saved")
         say(f"Final results → {res_path}")
+
+
+
+
+Delta_mc = 4
 
 def fit_models( dataset_name: str = "basketball",
                 Delta: int = 7,
@@ -79,10 +84,8 @@ def fit_models( dataset_name: str = "basketball",
     results = _mote_carlo_CV(data, results, n_trials, n_teams, mc_samples, Delta, seed, say, save, dataset_name, res_path)
     # save the results
     _save_results(results, res_path, save, say)
-
-    say(f"\nCompleted {len(results)} trials")
     # print the table of comparison
-    print_online_results(results)
+    print_online_results(results, dataset_name = dataset_name + "n=" + str(n_teams)+"k=" + str(Delta) + "trial=" + str(n_trials))
 
 
 
@@ -91,29 +94,40 @@ def fit_models( dataset_name: str = "basketball",
 
 def _mote_carlo_CV(data, results, n_trials, n_teams, mc_samples, Delta, seed, say, save, dataset_name, res_path):
     """Main loop of the MCCV random splits"""
+    rng = np.random.default_rng(seed)
+    # produce a 100 random seeds using rng.integers(0, 1000000, 100)
+    random_seeds = rng.integers(0, 1000000, 150)
+    df_results = None
 
     for t in range(len(results), n_trials):      
         say(f"Trial {t + 1}/{n_trials}")
 
         # if news or movies, perform a random split; else perform a chronologically split
         if dataset_name in ['movie_lens', 'news', 'sushi']:
-            train, test, *_ = train_split(data, 0.8, seed + t)
+            train, test, *_ = train_split(data, 0.7, random_seeds[t])
         else:
-             train, test, *_ = chronologically_train_split(data, seed + t)
+             train, test, *_ = chronologically_train_split(data, random_seeds[t])
         train, test = np.array(train), np.array(test)
 
 
         # create a trial dictionary
-        benchmark_models_names = ['our', 'L1', 'L2']#, 'tau', 'pl', 'BT', 'pl_reg'] #['our', 'L1', 'L2', 'tau', 'pl', 'pl_reg']
-        trial = {model_name: [] for model_name in benchmark_models_names}
+        benchmark_models_names = ['our', 'L1', 'L2', 'tau', 'pl', 'BT', 'pl_reg'] #['our', 'L1', 'L2', 'tau', 'pl', 'pl_reg']
+
         # create a zip of benchmark models
+
         for model_name in benchmark_models_names:
             res_evals, args = _fit_benchmark_models(model_name, train, test, n_teams, mc_samples, Delta, say)
-            trial[model_name].append({'evals': res_evals, 'args': args})
-        
-        results=trial.copy() # TODO: not reading from results
+            all_metric_names = list(res_evals.keys())
+            columns = ['Model'] + list(all_metric_names) + ['alpha', 'beta']
+            if df_results is None:
+                df_results = pd.DataFrame(columns=columns)
+            row_temp = [model_name] + [res_evals[metric] for metric in all_metric_names]
+            row_temp += [args['alpha'], args['beta']] if 'alpha' in args else [0, 0]
+            df_results.loc[len(df_results)] = row_temp
 
-    return results
+
+
+    return df_results
 
 
 
@@ -150,13 +164,14 @@ def fit_mallows(train, test, k, mc, delta, say, alpha_fixed=False, alpha_fixed_v
     say(f"        Mallows is learned with alpha: {alpha:.4f}, beta: {beta:.4f}")
     say(f"        testing the Mallows model with {mc} samples...")
     # testing the model ...
-    Delta_mc = 4
+
     samples = sample_truncated_mallow(n=k, alpha=alpha, beta=beta, sigma=sigma_0, Delta=Delta_mc, num_samples=mc)
     args = {
         "sigma_0": sigma_0,
         "alpha": alpha,
         "beta": beta,
     }
+
     return samples, args
 
 
@@ -175,7 +190,13 @@ def fit_pl(train, test, n_teams, mc_samples, Delta, say, alpha_fixed=None, alpha
 
 def fit_pl_reg(train, test, n_teams, mc_samples, Delta, say, alpha_fixed=None, alpha_fixed_value=None, BL_model=False):
     say(f"  Starting to learn Regularized Plackett-Luce model for {len(train[0])} items ...")
-    lambda_reg = 0.1
+    if n_teams < 20:
+        lambda_reg = 0.001
+    elif n_teams > 60:
+        lambda_reg = 0.1
+    else:
+        lambda_reg = 0.01
+
     util, _ = learn_PL(train - 1, test- 1, lambda_reg=lambda_reg, BL_model=BL_model)
     say(f"        Regularized Plackett-Luce is learned.")
     say(f"        Testing the regularized PL model with {mc_samples} samples...")
@@ -194,6 +215,7 @@ def fit_kendall(train, test, n_teams, mc_samples, Delta, say, alpha_fixed=None, 
     # testing the model ...
     samples = sample_kendal(sigma_0=sigma_0, theta=theta, num_samples=mc_samples)
     args={"sigma_0": sigma_0, "theta": theta}
+
     return samples, args
 
 def pack(*vals, suffix=""):            # names metrics[0] → f"{prefix}metric_name"
