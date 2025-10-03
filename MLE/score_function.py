@@ -7,23 +7,14 @@ from itertools import permutations
 # Wrapper function for multiple workers
 def psi_m_wrapper_no_alpha(x, pis, sigma, Delta, alpha, ord=1/2): 
     lookup_data = load_lookup_tables(len(sigma), Delta=Delta)
-    psi = psi_m(pis, sigma,alpha, x[0], lookup_data)
-    #psi[1] = np.log(np.abs(psi[1]))#/len(sigma) 
-    #psi = psi/len(sigma)   # Normalize the second component for more robust optimization
-
-    return np.linalg.norm(psi, ord=2) #+ np.sqrt(len(sigma))*(np.exp(-x[0])) + np.exp(-x[1])  # Return the L1/2 norm of the score
-                                         # function for more robust optimization
-                                         # when using differential evolution
+    psi = psi_m(pis, sigma,alpha, x[0], lookup_data, normalizitation_constant=None)
+    return np.linalg.norm(psi, ord=2) 
 
 def psi_m_wrapper(x, pis, sigma, Delta, ord=1/2): 
-    lookup_data = load_lookup_tables(len(sigma), Delta=Delta)
-    psi = psi_m(pis, sigma, x[0], x[1], lookup_data)
-    #psi[1] = np.log(np.abs(psi[1]))#/len(sigma) 
-    #psi = psi/len(sigma)   # Normalize the second component for more robust optimization
+    lookup_data = load_lookup_tables(len(sigma), Delta=Delta)#load_lookup_tables(10, Delta=7)#load_lookup_tables(len(sigma), Delta=Delta)
+    psi = psi_m(pis, sigma, x[0], x[1], lookup_data,  normalizitation_constant=None)
 
-    return np.linalg.norm(psi, ord=2) #+ np.sqrt(len(sigma))*(np.exp(-x[0])) + np.exp(-x[1])  # Return the L1/2 norm of the score
-                                         # function for more robust optimization
-                                         # when using differential evolution
+    return np.linalg.norm(psi, ord=1) 
 
 
 # Main function utilizing interpolated lookup tables
@@ -31,7 +22,9 @@ def psi_m(pis: np.ndarray,
           sigma: np.ndarray,
           alpha: float,
           beta:  float,
-          lookup_data):
+          lookup_data,
+          return_all=False,
+          normalizitation_constant=None):
     import numpy as np
     from itertools import permutations
     # all the permutations of the first 10 integers
@@ -44,32 +37,35 @@ def psi_m(pis: np.ndarray,
 
 
 
+
+
     # empirical part
 
-    d_mc, d_dot_mc, alpha_used, beta_used = nearest_neighbor_lookup(alpha, beta, lookup_data)
-    alpha = alpha_used
-    beta = beta_used
+    # d_mc, d_dot_mc, alpha_used, beta_used = nearest_neighbor_lookup(alpha, beta, lookup_data)
+    # alpha = alpha_used
+    # beta = beta_used
 
 
     diff_emp = np.abs(pis - sigma)
     d_emp, d_dot_emp = _d_and_ddiff(diff_emp, alpha)
     d_emp      = d_emp.mean()
     d_dot_emp  = d_dot_emp.mean()
-    # variance reduc
-    d_emp = np.log(d_emp/len(pis))
-    d_dot_emp = np.log(d_dot_emp/len(pis))
-    d_mc = np.log(d_mc/len(pis))
-    d_dot_mc = np.log(d_dot_mc/len(pis))
+
     # expectation using interpolators
-    # E_d_interp, E_dot_d_interp = create_interpolators(lookup_data)
-    # d_mc = E_d_interp(alpha, beta)[0][0]
-    # d_dot_mc = E_dot_d_interp(alpha, beta)[0][0]
-    # print('for alpha', alpha, 'and beta', beta)
-    # print(' empirical: ', f'{d_emp:.1f}', f'{d_dot_emp:.1f}')
-    # print(' expected: ', f'{d_mc:.1f}', f'{d_dot_mc:.1f}')
-    # assemble psi
+    E_d_interp, E_dot_d_interp = create_interpolators(lookup_data)
+    d_mc = E_d_interp(alpha, beta)[0][0]
+    d_dot_mc = E_dot_d_interp(alpha, beta)[0][0]
+
+    # variance reduc
+    d_emp = np.log(d_emp/len(pis)) 
+    d_dot_emp = np.log(d_dot_emp/len(pis)) 
+    d_mc = np.log(d_mc/len(pis)) if normalizitation_constant is None else np.log(d_mc/normalizitation_constant)
+    d_dot_mc = np.log(d_dot_mc/len(pis)) if normalizitation_constant is None else np.log(d_dot_mc/normalizitation_constant)
+    
     hat_psi_m = np.array([(-d_emp + d_mc), (-d_dot_emp + d_dot_mc)])
     # print('norm 2 psi_m', np.linalg.norm(hat_psi_m, ord=2), '\n')
+    if return_all:
+        return hat_psi_m, d_emp, d_dot_emp, d_mc, d_dot_mc
 
     return hat_psi_m
 
@@ -134,28 +130,3 @@ def _d_and_ddiff(diff, alpha):
     d_dot = diff_a * np.log(weights)
     return diff_a.sum(-1), d_dot.sum(-1)
 
-if __name__ == '__main__':
-    import numpy as np
-    from itertools import permutations
-    pis = np.array([np.arange(100),np.arange(100),np.arange(100)[::-1]])
-    sigma = np.arange(100)  
-    alpha = 1
-    beta = 1
-    lookup_data = load_lookup_tables(len(sigma), Delta=7)
-    # nearest neighbor lookup
-    d_mc, d_dot_mc, alpha_used, beta_used = nearest_neighbor_lookup(alpha, beta, lookup_data)
-    alpha = alpha_used
-    beta = beta_used
-    d_mc = np.log(d_mc) / len(pis)
-    d_dot_mc = np.log(d_dot_mc) / len(pis)
-    # temp test
-    diff_emp_temp= np.abs(pis - sigma)
-    d_emp_temp, d_dot_emp_temp = _d_and_ddiff(diff_emp_temp, alpha)
-    d_emp_temp      = np.log(d_emp_temp.mean()) / len(pis)
-    d_dot_emp_temp  = np.log(d_dot_emp_temp.mean()) / len(pis)
-    print(f'for alpha {alpha} and beta {beta}')
-    print(f'empirical: d_dot_emp_temp {d_dot_emp_temp:.2f}, d_emp_temp {d_emp_temp:.2f}')
-
-    print(f'expected: d_dot_mc {d_dot_mc:.2f}, d_mc {d_mc:.2f}')
-
-    _d_and_ddiff(diff_emp_temp, alpha)
