@@ -49,7 +49,6 @@ def run_real_world_experiment(args):
         mc_samples=args.mc_samples,
         seed=args.seed,
         n_trials=args.n_trials,
-        save=args.save,
         verbose=args.verbose
     )
 

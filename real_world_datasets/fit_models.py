@@ -1,222 +1,174 @@
-from __future__ import annotations
-from pathlib import Path
-import json
 import numpy as np
-import sys
 import pandas as pd
+import os
+import json
+# Data loading
+from real_world_datasets.loaders.data_loader import load_data
+from real_world_datasets.utils import train_split, chronologically_train_split, print_online_results
 
-# ── data & utils ────────────────────────────────────────────────────────────────
-from real_world_datasets.college_sports.load_data import load_data
-from real_world_datasets.sushi_dataset.load_data import load_sushi
-from real_world_datasets.utils import train_split, convert_numpy_to_native
-from real_world_datasets.utils import chronologically_train_split, convert_numpy_to_native
-from real_world_datasets.print_evaluations import print_online_results
-    
-# ── Mallows (L-α) ──────────────────────────────────────────────────────────────
+# Model fitting and sampling
 from MLE.consensus_ranking_estimation import consensus_ranking_estimation
 from MLE.alpha_beta_estimation import solve_alpha_beta
 from GMM_diagonalized.sampling import sample_truncated_mallow
-
-# ── Plackett–Luce & Kendall ────────────────────────────────────────────────────
 from benchmark.fit_placket_luce import learn_PL, sample_PL
 from benchmark.fit_Mallow_kendal import learn_kendal, sample_kendal
 
-from real_world_datasets.movie_lens.load_MovieLens import load_and_return_ratings_movies
-from real_world_datasets.news.load_news import load_news_data
-
-# ── common evaluation ─────────────────────────────────────────────────────────
-from MLE.top_k import evaluate_metrics
-from real_world_datasets.config import METRIC_NAMES
+# Evaluation
+from MLE.test_metrics import evaluate_metrics
 
 
-#####################################################
-# fitting models (Mallows, Plackett-Luce, Kendall)
-# on real-world datasets (college sports, sushi)
-#####################################################
-def _get_data(dataset_name, n_teams):
-        
-    if dataset_name == 'sushi':
-        data = load_sushi()
-    elif dataset_name == 'movie_lens':
-        data = load_and_return_ratings_movies(n_movies=n_teams)
-    elif dataset_name == 'news':
-        data = load_news_data(n_items_to_keep=n_teams)
-    else:
-        data = load_data(dataset_name=dataset_name, n_teams_to_keep=n_teams)
-    return data
-
-def _read_results(dataset_name, n_teams, save):    
-    res_path = Path(f"real_world_datasets/results/{dataset_name}_n_teams={n_teams}.json")
-    res_path.parent.mkdir(parents=True, exist_ok=True) # create the directory if it doesn't exist
-    if save==True:
-        results = json.loads(res_path.read_text()) if res_path.exists() else []
-    else:
-        results = []
-    return results, res_path
-
-def _save_results(results, res_path, save, say):
-    if save:
-        res_path.write_text(json.dumps(convert_numpy_to_native(results), indent=2))
-        say("  ⭑ intermediate results saved")
-        say(f"Final results → {res_path}")
+DELTA_MC = 4  # Monte Carlo sampling parameter
 
 
 
-
-Delta_mc = 4
-
-def fit_models( dataset_name: str = "basketball",
+def fit_models(dataset_name: str = "basketball",
                 Delta: int = 7,
                 seed: int = 42,
                 n_trials: int = 50,
                 n_teams: int = 10,
                 mc_samples: int = 10_000,
-                save: bool = False,
-                verbose: bool = True
-                ):
-    # print if verbose else do nothing
-    say = print if verbose else (lambda *_, **__: None) 
-    # get the data 
-    data = _get_data(dataset_name, n_teams)
-    # get the results if they exist; else create an empty list
-    results, res_path = _read_results(dataset_name, n_teams, save) 
-    # fit the models using MCCV random splits
-    results = _mote_carlo_CV(data, results, n_trials, n_teams, mc_samples, Delta, seed, say, save, dataset_name, res_path)
-    # save the results
-    _save_results(results, res_path, save, say)
-    # print the table of comparison
-    print_online_results(results, dataset_name = dataset_name + "n=" + str(n_teams)+"k=" + str(Delta) + "trial=" + str(n_trials))
+                verbose: bool = True):
+    """
+    Fit and compare ranking models on real-world datasets using Monte Carlo cross-validation.
+    """
+    say = print if verbose else lambda *_, **__: None
+    data = load_data(dataset_name, n_teams)
+    results = _monte_carlo_cv(data, dataset_name, n_trials, n_teams, mc_samples, Delta, seed, say)
+    experiment_name = f"{dataset_name}n={n_teams}k={Delta}trial={n_trials}"
+
+    saving_path = os.path.join(os.path.dirname(__file__), 'results_json', experiment_name)
+    os.makedirs(saving_path, exist_ok=True)
+    with open(os.path.join(saving_path, 'results.json'), 'w') as f:
+        json.dump(results.to_dict(), f)
+    print_online_results(results, dataset_name=experiment_name)
 
 
 
 
 
 
-def _mote_carlo_CV(data, results, n_trials, n_teams, mc_samples, Delta, seed, say, save, dataset_name, res_path):
-    """Main loop of the MCCV random splits"""
+def _monte_carlo_cv(data, dataset_name, n_trials, n_teams, mc_samples, Delta, seed, say):
+    """Run Monte Carlo cross-validation with multiple train/test splits."""
     rng = np.random.default_rng(seed)
-    # produce a 100 random seeds using rng.integers(0, 1000000, 100)
-    random_seeds = rng.integers(0, 1000000, 150)
-    df_results = None
+    random_seeds = rng.integers(0, 1_000_000, 150)    
+    # Models to benchmark
+    models = ['our', 'L1', 'L2', 'tau', 'pl']#, 'BT', 'pl_reg']
+    results_list = []
 
-    for t in range(len(results), n_trials):      
-        say(f"Trial {t + 1}/{n_trials}")
-
-        # if news or movies, perform a random split; else perform a chronologically split
+    for trial in range(n_trials):
+        say(f"[Trial {trial + 1}/{n_trials}]")
+        
         if dataset_name in ['movie_lens', 'news', 'sushi']:
-            train, test, *_ = train_split(data, 0.7, random_seeds[t])
+            train, test, *_ = train_split(data, 0.7, random_seeds[trial])
         else:
-             train, test, *_ = chronologically_train_split(data, random_seeds[t])
+            train, test, *_ = chronologically_train_split(data, random_seeds[trial])
+        
         train, test = np.array(train), np.array(test)
 
-
-        # create a trial dictionary
-        benchmark_models_names = ['our', 'L1', 'L2', 'tau', 'pl', 'BT', 'pl_reg'] #['our', 'L1', 'L2', 'tau', 'pl', 'pl_reg']
-
-        # create a zip of benchmark models
-
-        for model_name in benchmark_models_names:
-            res_evals, args = _fit_benchmark_models(model_name, train, test, n_teams, mc_samples, Delta, say)
-            all_metric_names = list(res_evals.keys())
-            columns = ['Model'] + list(all_metric_names) + ['alpha', 'beta']
-            if df_results is None:
-                df_results = pd.DataFrame(columns=columns)
-            row_temp = [model_name] + [res_evals[metric] for metric in all_metric_names]
-            row_temp += [args['alpha'], args['beta']] if 'alpha' in args else [0, 0]
-            df_results.loc[len(df_results)] = row_temp
+        # Fit each model and evaluate
+        for model_name in models:
+            metrics, params = _fit_and_evaluate(model_name, train, test, n_teams, mc_samples, Delta, say)
+            # Store results
+            row = {'Model': model_name, **metrics}
+            row['alpha'] = params.get('alpha', 0)
+            row['beta'] = params.get('beta', 0)
+            results_list.append(row)
+    
+    return pd.DataFrame(results_list)
 
 
 
-    return df_results
-
-
-
-def _fit_benchmark_models(model_name, train, test, n_teams, mc_samples, Delta, say):
-
-    if model_name == 'our':
-        samples, args = fit_mallows(train, test, n_teams, mc_samples, Delta, say)
-    elif model_name == 'L1':
-        samples, args = fit_mallows(train, test, n_teams, mc_samples, Delta, say, alpha_fixed=True)
-    elif model_name == 'L2':
-        samples, args = fit_mallows(train, test, n_teams, mc_samples, Delta, say, alpha_fixed=True, alpha_fixed_value=2)
-    elif model_name == 'pl':
-        samples, args = fit_pl(train, test, n_teams, mc_samples, Delta, say, BL_model=False)
+def _fit_and_evaluate(model_name, train, test, n_teams, mc_samples, Delta, say):
+    """Fit a model and evaluate it on test data."""
+    # Fit model based on name
+    if model_name in ['our', 'L1', 'L2']:
+        # Mallows variants: 'our' learns alpha, 'L1' fixes alpha=1, 'L2' fixes alpha=2
+        alpha_map = {'our': None, 'L1': 1, 'L2': 2}
+        samples, params = _fit_mallows(train, n_teams, mc_samples, Delta, say, alpha_value=alpha_map[model_name])
+    
+    elif model_name in ['pl', 'BT']:
+        # Plackett-Luce variants: 'pl' is standard, 'BT' is Bradley-Terry
+        samples, params = _fit_plackett_luce(train, mc_samples, say, BL_model=(model_name == 'BT'))
+    
     elif model_name == 'pl_reg':
-        samples, args = fit_pl_reg(train, test, n_teams, mc_samples, Delta, say, BL_model=False)
-    elif model_name == 'BT':
-        samples, args = fit_pl(train, test, n_teams, mc_samples, Delta, say, BL_model=True)
+        samples, params = _fit_plackett_luce_reg(train, n_teams, mc_samples, say)
+    
     elif model_name == 'tau':
-        samples, args = fit_kendall(train, test, n_teams, mc_samples, Delta, say)
-    else:
-        raise ValueError(f"Model {model_name} not found")
-    evals = evaluate_metrics(test, samples)
-
-    return evals, args
-
+        samples, params = _fit_kendall(train, mc_samples, say)
+   
+    # Evaluate on test data
+    metrics = evaluate_metrics(test, samples)
+    return metrics, params
 
 
-def fit_mallows(train, test, k, mc, delta, say, alpha_fixed=False, alpha_fixed_value=1):
 
-    say(f"  Starting to learn Mallows model for {len(train[0])} items ...")
-    sigma_0 = consensus_ranking_estimation(train,alpha_fixed=alpha_fixed, alpha_fixed_value=alpha_fixed_value)
-    alpha, beta = solve_alpha_beta(train, sigma_0, Delta=delta, fixed_alpha=alpha_fixed, fixed_alpha_value=alpha_fixed_value)
-
-    say(f"        Mallows is learned with alpha: {alpha:.4f}, beta: {beta:.4f}")
-    say(f"        testing the Mallows model with {mc} samples...")
-    # testing the model ...
-
-    samples = sample_truncated_mallow(n=k, alpha=alpha, beta=beta, sigma=sigma_0, Delta=Delta_mc, num_samples=mc)
-    args = {
-        "sigma_0": sigma_0,
-        "alpha": alpha,
-        "beta": beta,
-    }
-
-    return samples, args
-
-
-def fit_pl(train, test, n_teams, mc_samples, Delta, say, alpha_fixed=None, alpha_fixed_value=None, BL_model=False):
-    say(f"  Starting to learn Plackett-Luce model for {len(train[0])} items ...")
+def _fit_mallows(train, k, mc, delta, say, alpha_value=None):
+    say(f"====> Learning Mallows model ({len(train[0])} items)...")   
+    # Determine if alpha is fixed
+    alpha_fixed = (alpha_value is not None)
+    alpha_val = alpha_value if alpha_fixed else 1
     
+    # Estimate consensus ranking
+    sigma_0 = consensus_ranking_estimation(train, alpha_fixed=alpha_fixed, alpha_fixed_value=alpha_val)
     
-    util, _ = learn_PL(train - 1, test- 1, BL_model=BL_model)
-    say(f"        Plackett-Luce is learned.")
-    say(f"        Testing the PL model with {mc_samples} samples...")
-    # testing the model ...
+    # Estimate alpha and beta parameters
+    alpha, beta = solve_alpha_beta(train, sigma_0, Delta=delta, fixed_alpha=alpha_fixed, fixed_alpha_value=alpha_val)
+   
+    # Generate samples
+    samples = sample_truncated_mallow(n=k, alpha=alpha, beta=beta, sigma=sigma_0, Delta=DELTA_MC, num_samples=mc)
+    
+    return samples, {"sigma_0": sigma_0, "alpha": alpha, "beta": beta}
+
+
+def _fit_plackett_luce(train, mc_samples, say, BL_model=False):
+    model_name = "Bradley-Terry" if BL_model else "Plackett-Luce"
+    say(f"====> Learning {model_name} model ({len(train[0])} items)...")
+    
+    # Learn utilities (convert to 0-indexing)
+    util, _ = learn_PL(train - 1, train - 1, BL_model=BL_model)
+    
+    # Generate samples (returns 0-indexed rankings)
     samples = sample_PL(util, n_samples=mc_samples)
-    args={"util": util}
-    return samples, args
+    
+    # Convert back to 1-indexed to match test data format
+    samples = samples + 1
+    
+    return samples, {"util": util}
 
 
-def fit_pl_reg(train, test, n_teams, mc_samples, Delta, say, alpha_fixed=None, alpha_fixed_value=None, BL_model=False):
-    say(f"  Starting to learn Regularized Plackett-Luce model for {len(train[0])} items ...")
+def _fit_plackett_luce_reg(train, n_teams, mc_samples, say):
+    say(f"====> Learning Regularized Plackett-Luce model ({len(train[0])} items)...")
+    # Set regularization parameter based on team count
     if n_teams < 20:
         lambda_reg = 0.001
     elif n_teams > 60:
         lambda_reg = 0.1
     else:
         lambda_reg = 0.01
-
-    util, _ = learn_PL(train - 1, test- 1, lambda_reg=lambda_reg, BL_model=BL_model)
-    say(f"        Regularized Plackett-Luce is learned.")
-    say(f"        Testing the regularized PL model with {mc_samples} samples...")
-    # testing the model ...
-    args={"util": util, "lambda_reg": lambda_reg}
+    
+    # Learn utilities with regularization (convert to 0-indexing)
+    util, _ = learn_PL(train - 1, train - 1, lambda_reg=lambda_reg, BL_model=False)
+    
+    # Generate samples (returns 0-indexed rankings)
     samples = sample_PL(util, n_samples=mc_samples)
+    
+    # Convert back to 1-indexed to match test data format
+    samples = samples + 1
+    
+    return samples, {"util": util, "lambda_reg": lambda_reg}
 
-    return samples, args
 
-
-def fit_kendall(train, test, n_teams, mc_samples, Delta, say, alpha_fixed=None, alpha_fixed_value=None):
-    say(f"  Starting to learn Kendall model for {len(train[0])} items ...")
-    sigma_0, theta, _ = learn_kendal(train - 1, test - 1)
-    say(f"        Kendall is learned with theta: {theta:.4f}.")
-    say(f"        testing the Kendall model with {mc_samples} samples...")
-    # testing the model ...
+def _fit_kendall(train, mc_samples, say):
+    say(f"====> Learning Kendall model ({len(train[0])} items)...")
+    
+    # Learn consensus and dispersion parameter (convert to 0-indexed)
+    sigma_0, theta, _ = learn_kendal(train - 1, train - 1)
+    say(f"    theta={theta:.4f}")
+    
+    # Generate samples (returns 0-indexed rankings)
     samples = sample_kendal(sigma_0=sigma_0, theta=theta, num_samples=mc_samples)
-    args={"sigma_0": sigma_0, "theta": theta}
-
-    return samples, args
-
-def pack(*vals, suffix=""):            # names metrics[0] → f"{prefix}metric_name"
-    return {f"{n}{suffix}": v for n, v in zip(METRIC_NAMES, vals)}
+    
+    # Convert back to 1-indexed to match test data format
+    samples = samples + 1
+    
+    return samples, {"sigma_0": sigma_0, "theta": theta}

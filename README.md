@@ -97,7 +97,8 @@ python script.py fit-real-world --dataset basketball --n-teams 10 --n-trials 3 -
 
 ### Real-World Dataset: football
 ```bash
-python script.py fit-real-world --dataset football --n-trials 3 --verbose
+python script.py fit-real-world --dataset football --n-teams 10 --n-trials 3 --verbose
+python script.py fit-real-world --dataset football --n-teams 100 --n-trials 3 --verbose
 ```
 
 ### Real-World Dataset: sushi

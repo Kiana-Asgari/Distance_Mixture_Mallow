@@ -44,30 +44,12 @@ import random
 import math
 
 def sample_kendal(theta, sigma_0, num_samples=1000):
-    """
-    Sample permutations from a Mallows model (Kendall's tau distance)
-    with central ranking sigma_0 and concentration parameter theta.
-
-    The insertion is reversed so that each new item in sigma_0
-    is more likely to be inserted near the *end* of the partial permutation
-    (rather than the front), matching the forward order given by sigma_0:
-
-      - Start with an empty list.
-      - For each item in sigma_0 (in the given order),
-        you generate an insertion position in [0..len(perm)] 
-        with weight propto exp(-theta*(reverse_index)).
-
-      - The far right of the current permutation has the highest weight.
-    """
     sampled_perms = []
 
     for _ in range(num_samples):
         perm = []
         for item in sigma_0:
             length = len(perm)
-            # Compute unnormalized weights so that the *end* is favored
-            # position goes from 0..length
-            # reverse_index = length - position
             weights = [math.exp(-theta * (length - k)) for k in range(length + 1)]
             total = sum(weights)
 

@@ -1,4 +1,6 @@
 import numpy as np
+import pandas as pd
+from pathlib import Path
 from numpy.random import default_rng
 from tabulate import tabulate
 from real_world_datasets.config import MODEL_LABEL, MODEL_NICE_NAME, METRICS_NICE_NAMES
@@ -82,30 +84,22 @@ def convert_numpy_to_native(obj):
 # Table builder
 ####################################
 def make_table(trials):
+    """Build and print a formatted table of trial results."""
     rows = []
 
-    # α and β belong to Original L1 (ML), Mallows Footrule (footrule), and Mallows Spearman (spearman)
+    # Add alpha and beta rows for Mallows models
     for p in ('alpha', 'beta'):
         arr = _fetch(trials, p)
         arr_footrule = _fetch(trials, f"{p}_footrule")
         arr_spearman = _fetch(trials, f"{p}_spearman")
         
-        # Debug: Check if spearman values are being found
-        if len(trials) > 0 and f"{p}_spearman" in trials[0]:
-            print(f"Found {p}_spearman values: {arr_spearman}")
-        
-        # Debug: Print the first few values to check if they're being found
-        if len(trials) > 0:
-            print(f"Debug: {p}_spearman values found: {arr_spearman[:3]}")  # Show first 3 values
-        
-        # Create row with alpha/beta for ML, footrule, and spearman models, '--' for others
         row = [f"Estimated {p}"]
         for m in MODEL_LABEL:
-            if MODEL_LABEL[m] == 'ML':  # L_α-Mallows
+            if MODEL_LABEL[m] == 'ML':
                 row.append(_col(arr))
-            elif MODEL_LABEL[m] == 'footrule':  # L₁-Mallows
+            elif MODEL_LABEL[m] == 'footrule':
                 row.append(_col(arr_footrule))
-            elif MODEL_LABEL[m] == 'spearman':  # L₂-Mallows
+            elif MODEL_LABEL[m] == 'spearman':
                 row.append(_col(arr_spearman))
             else:
                 row.append('--')
@@ -137,3 +131,66 @@ def _fetch(trials, key):
     except KeyError:
         # If key doesn't exist, return array of zeros with same length as trials
         return np.zeros(len(trials))
+
+
+####################################
+# Results Printing and Saving
+####################################
+
+def print_online_results(results_df: pd.DataFrame, dataset_name: str):
+    """
+    Aggregate and print evaluation results, then save to CSV.
+    
+    Args:
+        results_df: DataFrame with columns [Model, alpha, beta, metrics...]
+        dataset_name: Name for the output CSV file
+    """
+    print('results_df', results_df)
+    
+    # Get unique model names and metric columns
+    model_names = results_df['Model'].unique()
+    metric_columns = [col for col in results_df.columns if col not in ['Model', 'alpha', 'beta']]
+    
+    # Build aggregated table
+    aggregated_rows = []
+    for model_name in model_names:
+        model_data = results_df[results_df['Model'] == model_name]
+        
+        # Aggregate row with formatted statistics
+        row = {
+            'Model': model_name,
+            'alpha': _format_parameter(model_data['alpha'].values),
+            'beta': _format_parameter(model_data['beta'].values),
+        }
+        
+        # Add formatted metrics
+        for metric in metric_columns:
+            row[metric] = _format_metric(model_data[metric].values)
+        
+        aggregated_rows.append(row)
+    
+    # Create and display final table
+    final_table = pd.DataFrame(aggregated_rows)
+    print(final_table)
+    
+    # Save to CSV
+    csv_path = Path('real_world_datasets/results_csv') / f'{dataset_name}.csv'
+    csv_path.parent.mkdir(parents=True, exist_ok=True)
+    final_table.to_csv(csv_path, index=False)
+    print(f'\nResults saved to: {csv_path}')
+
+
+def _format_metric(values):
+    """Format metric values as: mean% (± std%)"""
+    mean_val = np.mean(values) * 100
+    std_val = np.std(values) * 100 / np.sqrt(len(values))
+    return f"{mean_val:.3f} (± {std_val:.3f})"
+
+
+def _format_parameter(values):
+    """Format parameter values (alpha/beta) as: mean (± std) or '--' if zero"""
+    mean_val = np.mean(values)
+    if mean_val == 0:
+        return '--'
+    std_val = np.std(values) * 100 / np.sqrt(len(values))
+    return f"{mean_val:.3f}(± {std_val:.3f})"

@@ -118,5 +118,12 @@ dmypy.json
 *.swo
 .DS_Store
 
-# Project specific - MovieLens cache data
-real_world_datasets/movie_lens/cache/ 
+# Project specific - Dataset cache files
+real_world_datasets/loaders/cache_files/movielens/
+real_world_datasets/loaders/cache_files/sushi/
+# Keep news CSV as it's a static file (not ignored)
+# real_world_datasets/loaders/cache_files/news/full_rankings.csv is tracked
+
+# Legacy cache directories (can be removed)
+real_world_datasets/movie_lens/cache/
+real_world_datasets/sushi_dataset/sushi3-2016/ 

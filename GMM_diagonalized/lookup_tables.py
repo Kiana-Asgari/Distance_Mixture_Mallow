@@ -1,6 +1,7 @@
 import numpy as np
 import pickle
 import csv
+import os
 from sampling import dp_wrapper
 # from partition_estimation import Z_wrap
 from joblib import Parallel, delayed
@@ -8,8 +9,8 @@ from joblib import Parallel, delayed
 # Parameters
 def generate_lookup_tables(n, Delta):
     print(f'Starting to generate lookup tables for n={n}, Delta={Delta}.')
-    alpha_vals = np.linspace(0.1, 3, 40)
-    beta_vals = np.linspace(0.05, 2.0, 30)
+    alpha_vals = np.linspace(0.01, 2.0, 100)
+    beta_vals = np.linspace(0.01, 2.0, 100)
 
     # Helper functions for finite difference approximations
     def compute_entry(alpha, beta, n, Delta, h=1e-5):
@@ -26,7 +27,7 @@ def generate_lookup_tables(n, Delta):
         return Z, E_d, E_dot_d
 
     # Parallel computation
-    results = Parallel(n_jobs=1, verbose=10)(
+    results = Parallel(n_jobs=4, verbose=200)(
         delayed(compute_entry)(alpha, beta, n, Delta)
         for alpha in alpha_vals
         for beta in beta_vals
@@ -47,6 +48,9 @@ def generate_lookup_tables(n, Delta):
         'E_dot_d_table': E_dot_d_table
     }
 
+    # Ensure the directory exists
+    os.makedirs('GMM_diagonalized/lookup_tables', exist_ok=True)
+    
     pickle_filename = f'GMM_diagonalized/lookup_tables/mallows_lookup_tables_n{n}_Delta{Delta}.pkl'
     with open(pickle_filename, 'wb') as f:
         pickle.dump(lookup_data, f)
@@ -75,6 +79,6 @@ def generate_lookup_tables(n, Delta):
 if __name__ == "__main__":
     #generate_lookup_tables(5)
     # generate_lookup_tables(10)
-    for n in [ 50]:
+    for n in [10]:
         for Delta in [8]:
             generate_lookup_tables(n=n, Delta=Delta)
