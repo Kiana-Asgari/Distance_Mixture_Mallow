@@ -1,155 +1,279 @@
 import numpy as np
 from scipy.optimize import minimize
-from typing import Optional
+from typing import Optional, List, Tuple
+
+from real_world_datasets.utils import check_zero_based_index
+
+try:
+    from joblib import Parallel, delayed
+    HAS_JOBLIB = True
+except ImportError:
+    HAS_JOBLIB = False
 
 
-# ----------------------------------------------------------------------
-#  High-level helper
-# ----------------------------------------------------------------------
-def learn_PL(permutations_train, permutations_test, lambda_reg: float = 0, BL_model: bool = False):
-    """
-    Fit a Plackett–Luce model and return (utilities , normalised-NLL on test set).
-    If BL_model=True, reduces to Bradley-Terry model (pairwise comparisons only).
+# =============================================================================
+# Smart Initialization
+# =============================================================================
+
+def get_smart_init(rankings: np.ndarray) -> np.ndarray:
+    """Frequency-based initialization for faster convergence."""
+    n_items = rankings.shape[1]
+    # Weight by position: items ranked higher get higher scores
+    position_weights = 1.0 / (np.arange(n_items) + 1)
+    scores = np.zeros(n_items)
+    for pos in range(n_items):
+        np.add.at(scores, rankings[:, pos], position_weights[pos])
+    scores /= len(rankings)
+    scores[0] = 0  # Fix first item
+    return scores[1:] - scores[1:].mean()
+
+
+# =============================================================================
+# Core NLL and Gradient Computation
+# =============================================================================
+
+def compute_nll(rankings: np.ndarray, params_free: np.ndarray, lambda_reg: float = 0.0, 
+                BL_model: bool = False) -> float:
+
+    # Reconstruct full parameter vector with θ₀ = 0
+    params = np.concatenate([[0.0], params_free])
     
-    Parameters
-    ----------
-    permutations_train : np.ndarray
-        Training permutations
-    permutations_test : np.ndarray
-        Test permutations
-    lambda_reg : float, default=0.01
-        Ridge regularization parameter
-    BL_model : bool, default=True
-        If True, reduces to Bradley-Terry model (pairwise comparisons only)
+    exp_theta = np.exp(params)
+    exp_utils = exp_theta[rankings]
+    
+    if BL_model:
+        # Bradley-Terry: P(i > j) = exp(θ_i) / (exp(θ_i) + exp(θ_j))
+        exp_utils_safe = np.maximum(exp_utils, 1e-300)
+        nll = np.log(exp_utils_safe[:, 0] + exp_utils_safe[:, 1]) - np.log(exp_utils_safe[:, 0])
+    else:
+        # Plackett-Luce: sequential choice model - numerical stability
+        denom = np.flip(np.cumsum(np.flip(exp_utils, axis=1), axis=1), axis=1)
+        denom = np.maximum(denom, 1e-300)
+        exp_utils_safe = np.maximum(exp_utils, 1e-300)
+        nll = np.log(denom[:, :-1]) - np.log(exp_utils_safe[:, :-1])
+    
+    # Ridge regularization (fixed bug)
+    ridge = 0.5 * lambda_reg * np.sum(params_free**2)
+    return nll.sum() / len(rankings) + ridge
+
+
+def compute_gradient(rankings: np.ndarray, params_free: np.ndarray, lambda_reg: float = 0.0,
+                     BL_model: bool = False) -> np.ndarray:
+
+    # Reconstruct full parameter vector with θ₀ = 0
+    params = np.concatenate([[0.0], params_free])
+    n_items = len(params)
+    
+    exp_theta = np.exp(params)
+    exp_utils = exp_theta[rankings]
+    grad_full = np.zeros(n_items)
+    
+    if BL_model:
+        exp_utils_safe = np.maximum(exp_utils, 1e-300)
+        first, second = rankings[:, 0], rankings[:, 1]
+        probs = exp_utils_safe[:, 1] / (exp_utils_safe[:, 0] + exp_utils_safe[:, 1])
+        np.add.at(grad_full, first, probs)
+        np.add.at(grad_full, second, -probs)
+    else:
+        denom = np.flip(np.cumsum(np.flip(exp_utils, axis=1), axis=1), axis=1)
+        denom = np.maximum(denom, 1e-300)  # Numerical stability
+        probs = exp_utils / denom
+        
+        # Vectorized: subtract 1 for all chosen items at each position
+        np.add.at(grad_full, rankings[:, :-1].ravel(), -1)
+        
+        # Vectorized: add probabilities for all remaining items
+        for m in range(n_items - 1):
+            np.add.at(grad_full, rankings[:, m:].ravel(), probs[:, m:].ravel())
+    
+    # Extract gradient for free parameters (exclude θ₀) and add regularization
+    # CRITICAL: Average the gradient to match the averaged loss
+    grad_free = grad_full[1:] / len(rankings) + lambda_reg * params_free
+    
+    return grad_free
+
+
+# =============================================================================
+# Combined NLL + Gradient (avoids redundant computation)
+# =============================================================================
+
+def compute_nll_and_grad(rankings: np.ndarray, params_free: np.ndarray, 
+                         lambda_reg: float = 0.0, BL_model: bool = False) -> Tuple[float, np.ndarray]:
+    """Compute both NLL and gradient in one pass to avoid redundant exponential calculations."""
+    
+    params = np.concatenate([[0.0], params_free])
+    n_items = len(params)
+    
+    exp_theta = np.exp(params)
+    exp_utils = exp_theta[rankings]
+    grad_full = np.zeros(n_items)
+    
+    if BL_model:
+        # NLL - numerical stability
+        exp_utils_safe = np.maximum(exp_utils, 1e-300)
+        nll = np.log(exp_utils_safe[:, 0] + exp_utils_safe[:, 1]) - np.log(exp_utils_safe[:, 0])
+        
+        # Gradient
+        first, second = rankings[:, 0], rankings[:, 1]
+        probs = exp_utils_safe[:, 1] / (exp_utils_safe[:, 0] + exp_utils_safe[:, 1])
+        np.add.at(grad_full, first, probs)
+        np.add.at(grad_full, second, -probs)
+    else:
+        # NLL - Numerical stability: clip to avoid log(0)
+        denom = np.flip(np.cumsum(np.flip(exp_utils, axis=1), axis=1), axis=1)
+        denom = np.maximum(denom, 1e-300)
+        exp_utils_safe = np.maximum(exp_utils, 1e-300)
+        nll = np.log(denom[:, :-1]) - np.log(exp_utils_safe[:, :-1])
+        
+        # Gradient (vectorized)
+        probs = exp_utils / denom
+        np.add.at(grad_full, rankings[:, :-1].ravel(), -1)
+        for m in range(n_items - 1):
+            np.add.at(grad_full, rankings[:, m:].ravel(), probs[:, m:].ravel())
+    
+    # Regularization (fixed bug: was missing params_free**2)
+    ridge = 0.5 * lambda_reg * np.sum(params_free**2)
+    total_nll = nll.sum() / len(rankings) + ridge
+    # CRITICAL: Average the gradient to match the averaged loss
+    grad_free = grad_full[1:] / len(rankings) + lambda_reg * params_free
+    
+    return total_nll, grad_free
+
+
+# =============================================================================
+# Model Fitting
+# =============================================================================
+
+def fit_PL(rankings: np.ndarray, lambda_reg: float = 0.0, BL_model: bool = False) -> np.ndarray:
+
+    n_items = rankings.shape[1]
+    
+    # Smart initialization for faster convergence
+    x0 = get_smart_init(rankings)
+    
+    # Cache to avoid redundant computation when optimizer calls fun then jac with same params
+    cache = {'params': None, 'nll': None, 'grad': None}
+    
+    def objective(p):
+        if cache['params'] is None or not np.array_equal(p, cache['params']):
+            cache['nll'], cache['grad'] = compute_nll_and_grad(rankings, p, lambda_reg, BL_model)
+            cache['params'] = p.copy()
+        return cache['nll']
+    
+    def gradient(p):
+        if cache['params'] is None or not np.array_equal(p, cache['params']):
+            cache['nll'], cache['grad'] = compute_nll_and_grad(rankings, p, lambda_reg, BL_model)
+            cache['params'] = p.copy()
+        return cache['grad']
+    
+    result = minimize(
+        fun=objective,
+        x0=x0,
+        jac=gradient,
+        method='L-BFGS-B',
+        options={
+            'maxiter': 500,
+            'maxcor': 20,      # More memory for better convergence
+            'ftol': 1e-6,     # Tighter function tolerance
+            'gtol': 1e-4,      # Tighter gradient tolerance
+            'disp': False
+        }
+    )
+    
+    # Return full parameter vector with θ₀ = 0
+    return np.concatenate([[0.0], result.x])
+
+
+def evaluate_nll(rankings: np.ndarray, utilities: np.ndarray, BL_model: bool = False) -> float:
     """
-    model = PlackettLuceModel(permutations_train, BL_model=BL_model)
-    est_utils = model.fit(lambda_reg=lambda_reg)
-    nll = model.compute_normalized_nll(permutations_test, est_utils)
-    return est_utils, nll
+    Evaluate normalized NLL on test data (no regularization).
+    
+    utilities should be the full parameter vector (including θ₀ = 0).
+    """
+    # Extract free parameters (exclude θ₀)
+    params_free = utilities[1:]
+    nll = compute_nll(rankings, params_free, lambda_reg=0.0, BL_model=BL_model)
+    return nll / len(rankings)
 
 
-# ----------------------------------------------------------------------
-#  Plackett–Luce model class
-# ----------------------------------------------------------------------
-class PlackettLuceModel:
+# =============================================================================
+# Cross-Validation
+# =============================================================================
 
-    def __init__(self, rankings: np.ndarray, BL_model: bool = False):
-        """
-        Parameters
-        ----------
-        rankings : (n_rankings , n_items) int ndarray
-            Each row is a full ranking from *best* (col 0) to *worst* (last col).
-            Item values are indices 0 … n_items-1.
-        BL_model : bool, default=False
-            If True, reduces to Bradley-Terry model (pairwise comparisons only)
-        """
-        self.rankings = rankings
-        self.n_items  = rankings.shape[1]
-        self.BL_model = BL_model
-        if BL_model:
-            print("Bradley-Terry model is used\n\n")
- 
-
-
-    def negative_log_likelihood(self, params: np.ndarray, lambda_reg: float = 0.01) -> float:
-        """
-        Vectorised implementation of
-
-            L(θ) = − Σ_r Σ_{m=0}^{n−2} log  exp(θ_{π_r[m]}) /
-                                                Σ_{j≥m} exp(θ_{π_r[j]})
-                    + λ/2 * ||θ||²
-
-        where π_r is ranking r and λ is the ridge regularization parameter.
-        
-        If BL_model=True, reduces to Bradley-Terry model (pairwise comparisons only):
-            L(θ) = − Σ_r log exp(θ_{π_r[0]}) / (exp(θ_{π_r[0]}) + exp(θ_{π_r[1]}))
-        """
-        exp_theta   = np.exp(params)                   # (n_items,)
-        exp_utils   = exp_theta[self.rankings]         # (R , n)
-
-        if self.BL_model:
-            # Bradley-Terry model: only consider pairwise comparisons (first two items)
-            # P(i > j) = exp(θ_i) / (exp(θ_i) + exp(θ_j))
-            first_item_utils = exp_utils[:, 0]         # (R,)
-            second_item_utils = exp_utils[:, 1]        # (R,)
-            
-            # For Bradley-Terry: log P(first > second) = log(exp(θ_first) / (exp(θ_first) + exp(θ_second)))
-            # = θ_first - log(exp(θ_first) + exp(θ_second))
-            nll_matrix = np.log(first_item_utils + second_item_utils) - np.log(first_item_utils)
+def cross_validate_lambda(rankings: np.ndarray, lambda_candidates: List[float],
+                          n_folds: int = 5, BL_model: bool = False,
+                          random_seed: Optional[int] = None, n_jobs: int = 1) -> float:
+    """Select optimal lambda via k-fold cross-validation (parallel if joblib available)."""
+    n_samples = len(rankings)
+    rng = np.random.default_rng(random_seed)
+    indices = rng.permutation(n_samples)
+    
+    # Create folds
+    fold_sizes = np.full(n_folds, n_samples // n_folds, dtype=int)
+    fold_sizes[:n_samples % n_folds] += 1
+    folds = np.split(indices, np.cumsum(fold_sizes)[:-1])
+    
+    def eval_fold(k, lam):
+        train_idx = np.concatenate([folds[i] for i in range(n_folds) if i != k])
+        val_idx = folds[k]
+        utils = fit_PL(rankings[train_idx], lambda_reg=lam, BL_model=BL_model)
+        return evaluate_nll(rankings[val_idx], utils, BL_model)
+    
+    best_lambda, best_score = None, float('inf')
+    
+    for lam in lambda_candidates:
+        # Parallel if joblib available and n_jobs > 1
+        if HAS_JOBLIB and n_jobs != 1:
+            fold_scores = Parallel(n_jobs=n_jobs)(
+                delayed(eval_fold)(k, lam) for k in range(n_folds)
+            )
         else:
-            # Full Plackett-Luce model
-            # Denominator: reverse cumulative sums so that
-            # denom[r, m] = Σ_{j=m}^{n−1} exp(θ_{π_r[j]})
-            denom = np.flip(np.cumsum(np.flip(exp_utils, axis=1), axis=1), axis=1)
-
-            # Exclude the last deterministic choice (prob = 1)
-            numer       = exp_utils[:, :-1]
-            denom       = denom[:, :-1]
-
-            nll_matrix  = np.log(denom) - np.log(numer)    # (R , n−1)
+            fold_scores = [eval_fold(k, lam) for k in range(n_folds)]
         
-        # Add ridge regularization term
-        ridge_term = 0.5 * lambda_reg * np.sum(params**2)
+        avg_score = np.mean(fold_scores)
+        print(f"  λ={lam:.4f}: validation NLL = {avg_score:.6f} ± {np.std(fold_scores):.6f}")
         
-        return nll_matrix.sum() + ridge_term       # scalar
-
-    # -----------------------------
-    #  MLE fit
-    # -----------------------------
-    def fit(self, initial_guess: Optional[np.ndarray] = None, lambda_reg: float = 0.01) -> np.ndarray:
-        if initial_guess is None:
-            initial_guess = np.zeros(self.n_items)
-
-        # Create a wrapper function that passes the regularization parameter
-        def objective(params):
-            return self.negative_log_likelihood(params, lambda_reg)
-
-        res = minimize(
-            objective,
-            initial_guess,
-            method='L-BFGS-B',
-            options={'maxiter': 1000, 'disp': False}
-        )
-        return res.x
-
-    # -----------------------------
-    #  Vectorised test NLL
-    # -----------------------------
-    @staticmethod
-    def _matrix_nll(perms: np.ndarray, utilities: np.ndarray, BL_model: bool = False) -> float:
-        """Shared helper used by both train- and test-NLL routines."""
-        exp_theta = np.exp(utilities)
-        exp_utils = exp_theta[perms]
-        
-        if BL_model:
-            # Bradley-Terry model: only consider pairwise comparisons (first two items)
-            first_item_utils = exp_utils[:, 0]         # (R,)
-            second_item_utils = exp_utils[:, 1]        # (R,)
-            nll = np.log(first_item_utils + second_item_utils) - np.log(first_item_utils)
-        else:
-            # Full Plackett-Luce model
-            denom = np.flip(np.cumsum(np.flip(exp_utils, axis=1), axis=1), axis=1)
-            nll = np.log(denom[:, :-1]) - np.log(exp_utils[:, :-1])
-        
-        return nll.sum()
-
-    def compute_normalized_nll(
-        self, permutations_test: np.ndarray, estimated_utilities: np.ndarray
-    ) -> float:
-        total_nll = self._matrix_nll(permutations_test, estimated_utilities, self.BL_model)
-        return total_nll / permutations_test.shape[0]
+        if avg_score < best_score:
+            best_score, best_lambda = avg_score, lam
+    
+    return best_lambda
 
 
-# ----------------------------------------------------------------------
-#  Fully-vectorised Plackett–Luce sampler (Gumbel–Max)
-# ----------------------------------------------------------------------
+# =============================================================================
+# Main API
+# =============================================================================
+
+def learn_PL(permutations_train: np.ndarray, permutations_test: np.ndarray,
+             use_cv: bool = False, lambda_reg: float = 0.0,
+             lambda_candidates: Optional[List[float]] = None,
+             n_folds: int = 5, BL_model: bool = False, n_jobs: int = 1) -> Tuple[np.ndarray, float, Optional[float]]:
+
+    train = check_zero_based_index(permutations_train)
+    test = check_zero_based_index(permutations_test)
+    
+    if BL_model:
+        print("Using Bradley-Terry model\n")
+    
+    optimal_lambda = None
+    if use_cv:
+        if lambda_candidates is None:
+            lambda_candidates = [0.0, 0.0001, 0.0005, 0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1.0, 5.0]
+        optimal_lambda = cross_validate_lambda(train, lambda_candidates, n_folds, BL_model, n_jobs=n_jobs)
+        print(f"\nOptimal λ = {optimal_lambda}\n")
+        lambda_reg = optimal_lambda
+    
+    utilities = fit_PL(train, lambda_reg, BL_model)
+    test_nll = evaluate_nll(test, utilities, BL_model)
+    
+    return utilities, test_nll, optimal_lambda
+
+
+# =============================================================================
+# Sampling Utilities
+# =============================================================================
+
 def sample_PL(utilities: np.ndarray, n_samples: int = 1000, rng=None) -> np.ndarray:
-    """
-    Draw `n_samples` permutations *simultaneously* using the Gumbel–Max trick.
-
-    Each row is a ranking from best (col 0) to worst (last col).
-    """
+    """Sample rankings from Plackett-Luce model using Gumbel-Max trick."""
     rng = rng or np.random.default_rng()
-    gumbels   = rng.gumbel(size=(n_samples, len(utilities)))
-    scores    = utilities + gumbels                      # broadcast add
-    return np.argsort(-scores, axis=1).astype(np.int64)  # descending ⇒ best first
+    gumbels = rng.gumbel(size=(n_samples, len(utilities)))
+    return np.argsort(-(utilities + gumbels), axis=1).astype(np.int64)

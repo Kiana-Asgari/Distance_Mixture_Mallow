@@ -4,6 +4,24 @@ from tabulate import tabulate
 from real_world_datasets.config import MODEL_LABEL, MODEL_NICE_NAME, METRICS_NICE_NAMES
 
 
+def check_one_besed_index(pis: np.ndarray) -> bool:
+    pis = np.asarray(pis)
+    based_index = pis[0].min()
+    pis = pis - based_index + 1
+    for perm in pis:
+        if perm.min() != 1:
+            raise ValueError("The permutations are not one-based indexed")
+    return pis
+
+def check_zero_based_index(pis: np.ndarray) -> bool:
+    pis = check_one_besed_index(pis) - 1
+    for perm in pis:
+        if perm.min() != 0:
+            raise ValueError("The permutations are not zero-based indexed")
+    return pis
+
+
+
 
 def train_split(sushi_data, train_ratio, seed):
     # Randomly select indices for training using the RNG

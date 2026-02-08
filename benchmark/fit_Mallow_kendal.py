@@ -3,6 +3,7 @@ from scipy.optimize import minimize
 from scipy.stats import kendalltau
 from typing import Literal
 
+from real_world_datasets.utils import check_one_besed_index, check_zero_based_index
 def kendall_tau_distance(rank1, rank2):
     n = len(rank1)
     correlation, _ = kendalltau(rank1, rank2)
@@ -30,6 +31,9 @@ def negative_log_likelihood(theta, rankings, pi_0):
     return theta * total_distance + len(rankings) * np.log(z_theta(theta, n))
 
 def learn_kendal(permutations_train, permutations_test, weights:Literal[None, 'linear', 'log'] = None):
+    # convert to zero-based indexed
+    permutations_train = check_zero_based_index(permutations_train)
+    permutations_test = check_zero_based_index(permutations_test)
     pi_0 = borda_count(permutations_train)
     result = minimize(negative_log_likelihood, x0=1.0, args=(permutations_train, pi_0), bounds=[(0.01, None)])
     theta_hat = result.x[0]

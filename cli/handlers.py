@@ -50,7 +50,8 @@ def run_real_world_experiment(args):
         seed=args.seed,
         n_trials=args.n_trials,
         save=args.save,
-        verbose=args.verbose
+        verbose=args.verbose,
+        n_jobs=args.n_jobs
     )
 
 

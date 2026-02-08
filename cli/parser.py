@@ -11,6 +11,8 @@ def add_common_arguments(parser):
     """Add common arguments shared across subparsers."""
     parser.add_argument('--n-trials', type=int, default=1,
                        help='Number of trials (default: 1)')
+    parser.add_argument('--n-jobs', type=int, default=50,
+                       help='Number of parallel jobs; -1 for all CPUs (default: 1)')
     parser.add_argument('--save', action='store_true', default=False,
                        help='Save results (default: False)')
     parser.add_argument('--verbose', action='store_true', default=True,
@@ -21,7 +23,7 @@ def add_common_arguments(parser):
 def add_real_world_arguments(parser):
     """Add arguments specific to real-world dataset fitting."""
     parser.add_argument('--dataset', type=str, default='movie_lens',
-                       choices=['movie_lens', 'sushi', 'news', 'basketball', 'football'],
+                       choices=['movie_lens', 'sushi', 'news', 'basketball', 'football', 'baseball'],
                        help='Dataset name (default: movie_lens)')
     parser.add_argument('--n-teams', type=int, default=100,
                        help='Number of teams (default: 100)')

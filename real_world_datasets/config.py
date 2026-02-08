@@ -41,6 +41,7 @@ TOP_TEAMS = {
 FILES = {
     "basketball": ["cb2021.csv", "cb2020.csv"],
     "football": ["cf2021.csv", "cf2020.csv", "cf2019.csv"],
+    "baseball": ["cb2021.csv", "cb2020.csv", "cb2019.csv"],
 } 
 
 

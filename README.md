@@ -88,23 +88,35 @@ To access college sports datasets, you need to have your *Kaggle* API credential
 
 ### Real-World Dataset: basketball
 ```bash
-python script.py fit-real-world --dataset basketball --n-teams 100 --n-trials 3 --verbose
+python script.py fit-real-world --dataset basketball --n-teams 100 --n-trials 1 --verbose
 ```
 
 ```bash
-python script.py fit-real-world --dataset basketball --n-teams 10 --n-trials 3 --verbose
+python script.py fit-real-world --dataset basketball --n-teams 10 --n-trials 1 --verbose
 ```
 
 ### Real-World Dataset: football
 ```bash
-python script.py fit-real-world --dataset football --n-trials 3 --verbose
+python script.py fit-real-world --dataset football --n-teams 100 --n-trials 1 --verbose
 ```
+```bash
+python script.py fit-real-world --dataset football --n-teams 10 --n-trials 1 --verbose
+```
+
+
+python script.py fit-real-world --dataset baseball --n-teams 10 --n-trials 1 --verbose
+
+
+
 
 ### Real-World Dataset: sushi
 ```bash
-python script.py fit-real-world --dataset sushi --n-trials 3 --verbose
+python script.py fit-real-world --dataset sushi --n-trials 1 --verbose
 ```
-
+### Movie Lense
+```bash
+python script.py fit-real-world --dataset movie_lens --n-movies 100 --n-trials 1 --verbose
+```
 
 
 ### Synthetic Data:

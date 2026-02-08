@@ -19,7 +19,7 @@ def load_data(n_teams_to_keep, dataset_name):
     elif dataset_name == 'football':
         print(f'choosing {n_teams_to_keep} most common teams for {dataset_name}')
         teams_to_keep = chose_most_common_teams(rankings_by_name, n_teams_to_keep)
-    elif dataset_name == 'basketball':
+    elif dataset_name == 'basketball' or dataset_name == 'baseball':
         teams_to_keep = all_team_names[:n_teams_to_keep]
     else:
         raise ValueError(f"Unknown dataset {dataset_name!r} (choose from {list(FILES)})")
