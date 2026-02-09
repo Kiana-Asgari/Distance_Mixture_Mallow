@@ -120,4 +120,5 @@ dmypy.json
 
 # Project specific - Real world datasets cache files
 real_world_datasets/movie_lens/cache_files/
-real_world_datasets/college_sports/cache_files/ 
+real_world_datasets/college_sports/cache_files/
+real_world_datasets/loaders/cache_files/ 
