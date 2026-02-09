@@ -118,5 +118,6 @@ dmypy.json
 *.swo
 .DS_Store
 
-# Project specific - MovieLens cache data
-real_world_datasets/movie_lens/cache/ 
+# Project specific - Real world datasets cache files
+real_world_datasets/movie_lens/cache_files/
+real_world_datasets/college_sports/cache_files/ 
