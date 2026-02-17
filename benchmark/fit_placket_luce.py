@@ -231,7 +231,7 @@ def cross_validate_lambda(rankings: np.ndarray, lambda_candidates: List[float],
             fold_scores = [eval_fold(k, lam) for k in range(n_folds)]
         
         avg_score = np.mean(fold_scores)
-        print(f"  λ={lam:.4f}: validation NLL = {avg_score:.6f} ± {np.std(fold_scores):.6f}")
+        #print(f"  λ={lam:.4f}: validation NLL = {avg_score:.6f} ± {np.std(fold_scores):.6f}")
         
         if avg_score < best_score:
             best_score, best_lambda = avg_score, lam

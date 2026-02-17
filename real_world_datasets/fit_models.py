@@ -107,6 +107,12 @@ def fit_models(dataset_name: str = "basketball", Delta: int = 7, seed: int = 42,
     """
     say = print if verbose else (lambda *_, **__: None)
     data = _get_data(dataset_name, n_teams)
+
+    print(f"{'*'*50}")
+    print(f"{'*'*50}")
+    print(f"DATA SHAPE: {np.array(data).shape}")
+    print(f"{'*'*50}")
+    print(f"{'*'*50}")
     results, res_path = _read_results(dataset_name, n_teams, save)
     
     # Store metadata
@@ -114,6 +120,7 @@ def fit_models(dataset_name: str = "basketball", Delta: int = 7, seed: int = 42,
         "dataset": dataset_name, "n_teams": n_teams, "Delta": Delta,
         "seed": seed, "n_trials": n_trials, "mc_samples": mc_samples
     }
+
     
     # Run trials (parallel or sequential)
     results = _mote_carlo_CV(data, results, n_trials, n_teams, mc_samples, Delta, seed, say, save, dataset_name, res_path, n_jobs)

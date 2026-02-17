@@ -66,8 +66,12 @@ def chronologically_train_split(sport_data, seed=None):
     test_pool_indices = np.arange(train_test_split, n_samples)
     
     # Randomly sample train_size indices from the training pool
-    train_size = 700#int(training_ratio * len(train_pool_indices))
-    test_size = 150#int(training_ratio * len(test_pool_indices))
+    # Use the smaller of desired size or available pool size
+    desired_train_size = 700
+    desired_test_size = 150
+    
+    train_size = min(desired_train_size, len(train_pool_indices)-100)
+    test_size = min(desired_test_size, len(test_pool_indices)-25)
     
     train_indices = rng.choice(train_pool_indices, size=train_size, replace=False)
     test_indices = rng.choice(test_pool_indices, size=test_size, replace=False)

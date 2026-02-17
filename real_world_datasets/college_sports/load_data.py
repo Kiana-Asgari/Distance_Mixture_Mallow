@@ -12,6 +12,7 @@ def load_data(n_teams_to_keep, dataset_name):
     print('loading data', dataset_name)
     top_10 = top_10_teams(dataset_name)
     all_team_names, rankings_by_name = fetch_data(dataset_name)
+    breakpoint()
 
 
     if n_teams_to_keep <= len(top_10):
