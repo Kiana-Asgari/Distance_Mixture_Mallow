@@ -55,20 +55,40 @@ FIG_DIR = Path(__file__).parent / "figures"
 # Per-model fit + log-likelihood
 # ----------------------------------------------------------------------
 def fit_and_loglik_distance(train, test, alpha_fixed: bool, alpha_value: float | None,
-                            Delta_train: int, target_tv: float, mcmc_samples: int):
-    """Fit L_alpha Mallows (LDER if alpha_fixed=False, L1/L2 otherwise)."""
+                            Delta_train: int, target_tv: float, mcmc_samples: int,
+                            max_refit_iters: int = 3):
+    """Fit L_alpha Mallows (LDER if alpha_fixed=False, L1/L2 otherwise).
+
+    Uses the same truncation Delta for fitting and evaluation: an initial fit
+    is made at ``Delta_train``, ``choose_truncation`` then picks the Delta
+    required for a target partition-function error, and the fit is repeated
+    at that Delta (iterating at most ``max_refit_iters`` times) so the score
+    equations and the log-likelihood use the same approximation.
+    """
     sigma_0 = consensus_ranking_estimation(
         train, alpha_fixed=alpha_fixed, alpha_fixed_value=alpha_value or 1,
     )
-    alpha, beta = solve_alpha_beta(
-        train, sigma_0, Delta=Delta_train,
-        fixed_alpha=alpha_fixed,
-        fixed_alpha_value=alpha_value or 1,
-    )
     n = len(sigma_0)
 
-    if alpha >= 1.0:
+    current_delta = Delta_train
+    alpha = beta = None
+    D = Delta_train
+    gap = float("nan")
+    for it in range(max_refit_iters + 1):
+        alpha, beta = solve_alpha_beta(
+            train, sigma_0, Delta=current_delta,
+            fixed_alpha=alpha_fixed,
+            fixed_alpha_value=alpha_value or 1,
+        )
+        if alpha < 1.0:
+            # MCMC-based log Z path below does not use a banded Delta.
+            break
         D, gap = choose_truncation(n, alpha, beta, target_tv=target_tv)
+        if D == current_delta:
+            break
+        current_delta = D
+
+    if alpha >= 1.0:
         log_z = log_Z_distance_dp(n, alpha, beta, D)
         ll = loglik_distance(test, sigma_0, alpha, beta, D, log_z=log_z)
         method = f"banded_dp_D={D}"
@@ -79,7 +99,7 @@ def fit_and_loglik_distance(train, test, alpha_fixed: bool, alpha_value: float |
             n_samples_logZ=mcmc_samples,
             rng_seed=0,
         )
-        method = "bridge_sampling"
+        method = "thermodynamic_integration"
         z_err = float(log_z_se)
     return {
         "loglik_mean": float(ll.mean()),
@@ -122,7 +142,7 @@ def run(args):
         models = ["our", "L1", "L2", "tau", "pl", "pl_reg"]
         n_trials = args.n_trials
 
-    out_csv = OUT_DIR / "held_out_log_likelihood.csv"
+    out_csv = OUT_DIR / args.output_csv
     fieldnames = [
         "dataset", "n", "trial", "model",
         "loglik_mean", "loglik_sd",
@@ -225,12 +245,18 @@ def main():
     p.add_argument("--target-tv", type=float, default=1e-4)
     p.add_argument("--mcmc-samples", type=int, default=20_000)
     p.add_argument("--seed", type=int, default=42)
-    p.add_argument("--datasets", type=str, default="all")
+    p.add_argument("--datasets", type=str, default="all",
+                   help="'all', 'n10', or a comma-separated list of 'name:n' pairs")
     p.add_argument("--quick", action="store_true")
+    p.add_argument("--output-csv", type=str, default="held_out_log_likelihood.csv",
+                   help="filename under results/ to append to (default: "
+                        "held_out_log_likelihood.csv)")
     args = p.parse_args()
 
     if args.datasets == "all":
         args.specs = all_dataset_specs()
+    elif args.datasets == "n10":
+        args.specs = [(name, k) for name, k in all_dataset_specs() if k == 10]
     else:
         args.specs = []
         for tok in args.datasets.split(","):
