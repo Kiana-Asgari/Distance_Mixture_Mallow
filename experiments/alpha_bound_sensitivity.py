@@ -53,16 +53,36 @@ ALPHA_MINS = [0.01, 0.05, 0.1, 0.2, 0.5]
 
 
 def fit_lder_custom_floor(train, test, alpha_min: float, Delta: int = 7,
-                          mcmc_samples: int = 5000, target_tv: float = 1e-4):
+                          mcmc_samples: int = 5000, target_tv: float = 1e-4,
+                          max_refit_iters: int = 3):
+    """Fit L_alpha Mallows with a custom alpha_min and evaluate held-out log-lik.
+
+    Uses the same Delta for fitting and evaluation: after an initial fit at
+    ``Delta``, ``choose_truncation`` picks the bandwidth that meets
+    ``target_tv``, and the fit is repeated at that bandwidth (up to
+    ``max_refit_iters`` iterations) so that the score-equation approximation
+    and the log-likelihood approximation agree.
+    """
     sigma_0 = consensus_ranking_estimation(train, alpha_fixed=False)
-    alpha, beta = solve_alpha_beta(
-        train, sigma_0, Delta=Delta,
-        alpha_bounds=(alpha_min, 3.0), beta_bounds=(1e-3, 2.0),
-        fixed_alpha=False,
-    )
     n = len(sigma_0)
-    if alpha >= 1.0:
+
+    current_delta = Delta
+    alpha = beta = None
+    D = Delta
+    for _ in range(max_refit_iters + 1):
+        alpha, beta = solve_alpha_beta(
+            train, sigma_0, Delta=current_delta,
+            alpha_bounds=(alpha_min, 3.0), beta_bounds=(1e-3, 2.0),
+            fixed_alpha=False,
+        )
+        if alpha < 1.0:
+            break
         D, _ = choose_truncation(n, float(alpha), float(beta), target_tv=target_tv)
+        if D == current_delta:
+            break
+        current_delta = D
+
+    if alpha >= 1.0:
         log_z = log_Z_distance_dp(n, float(alpha), float(beta), D)
         ll = loglik_distance(test, sigma_0, float(alpha), float(beta), D, log_z=log_z)
     else:
@@ -85,10 +105,15 @@ def fit_lder_custom_floor(train, test, alpha_min: float, Delta: int = 7,
 
 def run(args):
     specs = [("sushi", 10), ("news", 10)] if args.quick else DATASETS_N10
+    if args.datasets:
+        specs = []
+        for tok in args.datasets.split(","):
+            name, k = tok.split(":")
+            specs.append((name, int(k)))
     n_trials = 2 if args.quick else args.n_trials
     alpha_mins = args.alpha_mins
 
-    out_csv = OUT_DIR / "alpha_bound_sensitivity.csv"
+    out_csv = OUT_DIR / args.output_csv
     fieldnames = [
         "dataset", "n", "trial", "alpha_min",
         "alpha_hat", "beta_hat",
@@ -181,6 +206,10 @@ def main():
     p.add_argument("--seed", type=int, default=42)
     p.add_argument("--alpha-mins", type=float, nargs="*", default=ALPHA_MINS)
     p.add_argument("--quick", action="store_true")
+    p.add_argument("--datasets", type=str, default="",
+                   help="comma-separated 'name:n' pairs; empty = default n=10 list")
+    p.add_argument("--output-csv", type=str, default="alpha_bound_sensitivity.csv",
+                   help="filename under results/ (default: alpha_bound_sensitivity.csv)")
     args = p.parse_args()
     run(args)
 

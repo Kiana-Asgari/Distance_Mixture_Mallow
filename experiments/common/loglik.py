@@ -97,12 +97,21 @@ def choose_truncation(
     beta: float,
     target_tv: float = 1e-4,
     delta_min: int = 3,
-    delta_max: int = 10,
+    delta_max: int | None = None,
 ) -> tuple[int, float]:
     """Pick the smallest Delta such that the empirical relative-gap proxy <= target_tv.
 
+    When ``delta_max`` is None the cap is set to
+    ``min(n - 1, 2 * ceil(log(n / target_tv)))`` -- the bandwidth suggested by
+    Lemma 4.3 of the paper, with a factor-of-two safety margin. At n=10 and
+    target_tv=1e-4 this is ``min(9, 24) = 9``, so the full n! permanent is
+    always recoverable at small n. At large n it stops the loop at the
+    theoretically-recommended bandwidth rather than at an arbitrary 10.
+
     Returns (Delta_chosen, achieved_gap).
     """
+    if delta_max is None:
+        delta_max = 2 * int(math.ceil(math.log(max(n, 2) / target_tv)))
     delta_max = min(delta_max, n - 1)
     last_gap = float("inf")
     for D in range(delta_min, delta_max + 1):
