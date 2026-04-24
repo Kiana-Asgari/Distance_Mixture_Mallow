@@ -1,8 +1,5 @@
-from re import U
 import numpy as np
 from scipy.optimize import differential_evolution, least_squares
-import matplotlib.pyplot as plt
-import torch
 from MLE.score_function import create_interpolators
 from MLE.score_function import psi_m_wrapper, psi_m_wrapper_no_alpha, psi_m, load_lookup_tables
 
