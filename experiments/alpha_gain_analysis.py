@@ -1,11 +1,15 @@
-"""Experiment 6 (optional) -- When does learning alpha help?
+"""Quantifies how much learning alpha buys over the fixed-alpha baselines
+(L1-Mallows and L2-Mallows), as a function of how far the data-generating
+alpha sits from 1.
 
 Part A: Synthetic sweep over alpha_0 in {0.2, 0.5, 1.0, 1.5, 2.0, 3.0}.
-        For each, fit LDER, L1, L2 and report held-out log-likelihood gap
-        between LDER and the best fixed-alpha competitor.
+        For each alpha_0, fit L_alpha Mallows, L1, and L2, and report
+        the held-out log-likelihood gap between the learned-alpha fit
+        and the best fixed-alpha competitor.
 
-Part B: Real-data scatter -- gap of LDER over L1 vs |alpha_hat - 1|.
-        Reads pre-computed Exp 1 log-likelihood results.
+Part B: Real-data scatter -- gap of L_alpha Mallows over L1 against
+        ``|alpha_hat - 1|``. Reads the per-dataset log-likelihoods
+        produced by ``held_out_log_likelihood.py``.
 """
 
 from __future__ import annotations
@@ -21,13 +25,13 @@ from GMM_diagonalized.sampling import sample_truncated_mallow
 from MLE.alpha_beta_estimation import solve_alpha_beta
 from MLE.consensus_ranking_estimation import consensus_ranking_estimation
 
-from experiments.reviewer_response.common.loglik import (
+from experiments.common.loglik import (
     choose_truncation,
     log_Z_distance_dp,
     loglik_distance,
     loglik_distance_mcmc,
 )
-from experiments.reviewer_response.common.results_io import append_csv_row, existing_keys
+from experiments.common.results_io import append_csv_row
 
 OUT_DIR = Path(__file__).parent / "results"
 FIG_DIR = Path(__file__).parent / "figures"
@@ -52,7 +56,7 @@ def fit_distance(train, test, alpha_fixed: bool, alpha_value: float | None,
 
 
 def part_a(args):
-    out_csv = OUT_DIR / "exp6_synthetic_sweep.csv"
+    out_csv = OUT_DIR / "alpha_gain_synthetic_sweep.csv"
     if out_csv.exists() and not args.append:
         out_csv.unlink()
     fieldnames = [
@@ -112,12 +116,12 @@ def part_a(args):
 
 
 def part_b(args):
-    """Reads Experiment 1's log-likelihood CSV and produces a scatter."""
-    exp1_csv = OUT_DIR / "exp1_loglik.csv"
-    if not exp1_csv.exists():
-        print("Exp 1 results not found; skip Part B.")
+    """Reads the held-out log-likelihood CSV and produces a scatter."""
+    loglik_csv = OUT_DIR / "held_out_log_likelihood.csv"
+    if not loglik_csv.exists():
+        print("held_out_log_likelihood.csv not found; skipping Part B.")
         return
-    df = pd.read_csv(exp1_csv)
+    df = pd.read_csv(loglik_csv)
     df = df[df.n == 10]
     summary = df.groupby(["dataset", "model"]).agg(
         ll_mean=("loglik_mean", "mean"),
@@ -139,7 +143,7 @@ def part_b(args):
             })
         except KeyError:
             continue
-    out_csv = OUT_DIR / "exp6_real_scatter.csv"
+    out_csv = OUT_DIR / "alpha_gain_real_scatter.csv"
     if rows:
         pd.DataFrame(rows).to_csv(out_csv, index=False)
         import matplotlib
@@ -157,7 +161,7 @@ def part_b(args):
         ax.axhline(0, color="grey", lw=0.5)
         FIG_DIR.mkdir(parents=True, exist_ok=True)
         fig.tight_layout()
-        fig.savefig(FIG_DIR / "exp6_scatter.pdf")
+        fig.savefig(FIG_DIR / "alpha_gain_scatter.pdf")
 
 
 def main():

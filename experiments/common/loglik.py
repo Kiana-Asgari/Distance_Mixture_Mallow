@@ -11,7 +11,7 @@ from typing import Sequence
 import numpy as np
 
 from GMM_diagonalized.sampling import dp_wrapper
-from experiments.reviewer_response.common.distances import (
+from experiments.common.distances import (
     bridge_sample_logZ,
     d_alpha_batch,
     ti_logZ,

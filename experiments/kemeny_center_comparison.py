@@ -1,15 +1,16 @@
-"""Experiment 4 -- Stronger Mallows-tau baseline using exact Kemeny center
-on n=10 datasets, and a Borda + local-search heuristic for n=100.
+"""Refits the Mallows-tau baseline with an exact Kemeny consensus center
+(ILP, for n<=10 datasets) and a greedy adjacent-swap local-search
+heuristic (for n=100 datasets), comparing per-trial metrics against
+the Borda center otherwise used in the pipeline.
 
 Outputs:
-  - results/exp4_mallows_tau_exact.csv     (per dataset, per centering method)
-  - results/exp4_comparison.csv            (Borda vs. Kemeny side-by-side)
+  - results/kemeny_center_comparison.csv          (per dataset, per centering method)
+  - results/kemeny_center_comparison_summary.csv  (Borda vs. Kemeny side-by-side)
 """
 
 from __future__ import annotations
 
 import argparse
-import math
 import time
 from pathlib import Path
 
@@ -20,18 +21,18 @@ from tqdm import tqdm
 from benchmark.fit_Mallow_kendal import sample_kendal
 from MLE.top_k import evaluate_metrics
 from real_world_datasets.utils import check_zero_based_index
-from experiments.reviewer_response.common.datasets import (
-    DatasetUnavailable, SPORTS, all_dataset_specs, load_dataset, split,
+from experiments.common.datasets import (
+    DatasetUnavailable, all_dataset_specs, load_dataset, split,
 )
-from experiments.reviewer_response.common.kemeny import (
+from experiments.common.kemeny import (
     borda_order,
     kemeny_exact_ilp,
     kemeny_local_search,
     kemeny_objective,
     precedence_matrix,
 )
-from experiments.reviewer_response.common.loglik import loglik_kendall, log_Z_kendall
-from experiments.reviewer_response.common.results_io import append_csv_row, existing_keys
+from experiments.common.loglik import loglik_kendall, log_Z_kendall
+from experiments.common.results_io import append_csv_row, existing_keys
 
 OUT_DIR = Path(__file__).parent / "results"
 
@@ -122,7 +123,7 @@ def main():
     parser.add_argument("--datasets", type=str, default="all",
                         help="comma-separated 'name:n' pairs, or 'all', or 'small' (n=10 only)")
     parser.add_argument("--quick", action="store_true",
-                        help="2 trials, 50 mc samples, n=10 only -- smoke test")
+                        help="small grid (2 trials, 50 Monte Carlo samples, n=10 datasets) for quick validation")
     args = parser.parse_args()
 
     if args.quick:
@@ -139,7 +140,7 @@ def main():
             name, k = token.split(":")
             specs.append((name, int(k)))
 
-    out_csv = OUT_DIR / "exp4_mallows_tau_exact.csv"
+    out_csv = OUT_DIR / "kemeny_center_comparison.csv"
     fieldnames = [
         "dataset", "n", "trial", "center_method", "theta",
         "kendall_tau", "spearman_rho", "top1_hit_rate",
@@ -172,8 +173,8 @@ def main():
                       center_obj_mean=("center_objective_value", "mean"),
                       n_trials=("trial", "count"))
                  .reset_index())
-    summary.to_csv(OUT_DIR / "exp4_comparison.csv", index=False)
-    print(f"Wrote {OUT_DIR / 'exp4_comparison.csv'}")
+    summary.to_csv(OUT_DIR / "kemeny_center_comparison_summary.csv", index=False)
+    print(f"Wrote {OUT_DIR / 'kemeny_center_comparison_summary.csv'}")
 
 
 if __name__ == "__main__":

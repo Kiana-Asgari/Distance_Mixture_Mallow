@@ -56,7 +56,7 @@ def split(name: str, data, seed: int) -> Tuple[np.ndarray, np.ndarray]:
 
 
 def all_dataset_specs():
-    """List of (dataset_name, n_items) used throughout the reviewer response."""
+    """Default list of (dataset_name, n_items) pairs used by the experiments."""
     return [
         ("football", 10),
         ("football", 100),

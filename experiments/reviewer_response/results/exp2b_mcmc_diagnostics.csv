@@ -1,5 +1,0 @@
-n,alpha,beta,stat,value
-6,0.5,1.0,rhat_d_alpha,1.0599714455723623
-6,0.5,1.0,rhat_ddot_alpha,1.0684725148638476
-6,0.5,1.0,ess_d_alpha,32.44489773959747
-6,0.5,1.0,ess_ddot_alpha,27.034897502485876

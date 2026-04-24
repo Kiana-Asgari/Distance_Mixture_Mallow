@@ -1,26 +1,27 @@
-"""Experiment 1 -- Held-out approximate log-likelihood across all five
-competing models.
+"""Held-out approximate log-likelihood for L_alpha Mallows, L1-Mallows,
+L2-Mallows, Mallows-tau, and Plackett-Luce.
 
 For each (dataset, model, trial):
   1. Fit the model on the training split.
   2. Compute mean log P(pi) over the held-out test split.
-  3. Aggregate across 50 trials.
+  3. Aggregate across all trials.
 
-Z handling per model:
-  Mallows-tau, PL/BT     -> exact closed form
-  L1 / L2 / LDER (a>=1)  -> banded DP, truncation Delta picked so empirical
-                            relative gap to Delta+1 is <= target_tv (1e-4 by default)
-  LDER (a<1)             -> bridge sampling against the uniform law (5 chains)
+Partition-function handling per model:
+  Mallows-tau, Plackett-Luce -> exact closed form
+  L1 / L2 / L_alpha (a>=1)   -> banded DP, truncation Delta picked so the
+                                empirical relative gap to Delta+1 is <=
+                                target_tv (1e-4 by default)
+  L_alpha Mallows (a<1)      -> thermodynamic integration (5 chains)
 
 Outputs:
-  - results/exp1_loglik.csv
-  - figures/exp1_loglik_summary.pdf
+  - results/held_out_log_likelihood.csv
+  - results/held_out_log_likelihood_summary.csv
+  - figures/held_out_log_likelihood_summary.pdf
 """
 
 from __future__ import annotations
 
 import argparse
-import math
 from pathlib import Path
 
 import numpy as np
@@ -33,10 +34,10 @@ from MLE.alpha_beta_estimation import solve_alpha_beta
 from MLE.consensus_ranking_estimation import consensus_ranking_estimation
 from real_world_datasets.utils import check_zero_based_index
 
-from experiments.reviewer_response.common.datasets import (
+from experiments.common.datasets import (
     DatasetUnavailable, all_dataset_specs, load_dataset, split,
 )
-from experiments.reviewer_response.common.loglik import (
+from experiments.common.loglik import (
     choose_truncation,
     log_Z_distance_dp,
     loglik_PL,
@@ -44,7 +45,7 @@ from experiments.reviewer_response.common.loglik import (
     loglik_distance_mcmc,
     loglik_kendall,
 )
-from experiments.reviewer_response.common.results_io import append_csv_row, existing_keys
+from experiments.common.results_io import append_csv_row, existing_keys
 
 OUT_DIR = Path(__file__).parent / "results"
 FIG_DIR = Path(__file__).parent / "figures"
@@ -121,7 +122,7 @@ def run(args):
         models = ["our", "L1", "L2", "tau", "pl", "pl_reg"]
         n_trials = args.n_trials
 
-    out_csv = OUT_DIR / "exp1_loglik.csv"
+    out_csv = OUT_DIR / "held_out_log_likelihood.csv"
     fieldnames = [
         "dataset", "n", "trial", "model",
         "loglik_mean", "loglik_sd",
@@ -193,7 +194,7 @@ def run(args):
         ll_sd=("loglik_mean", "std"),
         n_trials=("trial", "count"),
     ).reset_index()
-    summary.to_csv(OUT_DIR / "exp1_loglik_summary.csv", index=False)
+    summary.to_csv(OUT_DIR / "held_out_log_likelihood_summary.csv", index=False)
 
     datasets_plotted = summary[["dataset", "n"]].drop_duplicates().values.tolist()
     if datasets_plotted:
@@ -211,7 +212,7 @@ def run(args):
         for idx in range(len(datasets_plotted), nrows * ncols):
             axes[idx // ncols][idx % ncols].axis("off")
         FIG_DIR.mkdir(parents=True, exist_ok=True)
-        out_pdf = FIG_DIR / "exp1_loglik_summary.pdf"
+        out_pdf = FIG_DIR / "held_out_log_likelihood_summary.pdf"
         fig.tight_layout()
         fig.savefig(out_pdf)
         print(f"wrote {out_pdf}")

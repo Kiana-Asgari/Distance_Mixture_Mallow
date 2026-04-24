@@ -1,13 +1,16 @@
-"""Experiment 2 -- alpha < 1 diagnostics.
+"""Diagnostics for the L_alpha Mallows partition function and score
+equations in the small-alpha regime.
 
-Part A: brute-force vs MCMC vs current-implementation expectations of
-        d_alpha and ddot_alpha for n in {6, 8, 10}, alpha in {0.1, 0.3, 0.5, 0.8},
+Part A: brute-force enumeration vs MCMC vs the banded-DP implementation
+        for E[d_alpha] and E[d_dot_alpha], on grid
+        n in {6, 8, 10}, alpha in {0.1, 0.3, 0.5, 0.8},
         beta in {0.1, 0.5, 1.0, 2.0}.
 
-Part B: MCMC mixing diagnostics (R-hat, ESS, trace plots) on the same grid.
+Part B: MCMC mixing diagnostics (Gelman-Rubin R-hat, Geyer ESS, trace
+        plots) on the same grid, five independent chains.
 
-Part C: Z_n approximation error for alpha < 1 via bridge sampling
-        (extension of Table 4).
+Part C: Partition-function approximation error for alpha < 1 via bridge
+        sampling and thermodynamic integration against exact enumeration.
 """
 
 from __future__ import annotations
@@ -18,11 +21,10 @@ from itertools import product
 from pathlib import Path
 
 import numpy as np
-import pandas as pd
 from tqdm import tqdm
 
-from MLE.score_function import compute_entry  # current implementation expectations
-from experiments.reviewer_response.common.distances import (
+from MLE.score_function import compute_entry  # banded-DP-based expectations
+from experiments.common.distances import (
     bridge_sample_logZ,
     d_alpha,
     d_alpha_dot,
@@ -33,7 +35,7 @@ from experiments.reviewer_response.common.distances import (
     mh_sample,
     ti_logZ,
 )
-from experiments.reviewer_response.common.results_io import append_csv_row, existing_keys
+from experiments.common.results_io import append_csv_row
 
 OUT_DIR = Path(__file__).parent / "results"
 FIG_DIR = Path(__file__).parent / "figures"
@@ -41,7 +43,7 @@ FIG_DIR = Path(__file__).parent / "figures"
 
 # ------------------------------------------------------------------
 def part_a(args):
-    out_csv = OUT_DIR / "exp2a_score_accuracy.csv"
+    out_csv = OUT_DIR / "score_equation_accuracy.csv"
     if out_csv.exists() and not args.append:
         out_csv.unlink()
 
@@ -101,7 +103,7 @@ def part_a(args):
 
 # ------------------------------------------------------------------
 def part_b(args):
-    out_csv = OUT_DIR / "exp2b_mcmc_diagnostics.csv"
+    out_csv = OUT_DIR / "mcmc_mixing_diagnostics.csv"
     if out_csv.exists() and not args.append:
         out_csv.unlink()
     fieldnames = ["n", "alpha", "beta", "stat", "value"]
@@ -154,12 +156,12 @@ def part_b(args):
             ax.legend(fontsize=7)
         FIG_DIR.mkdir(parents=True, exist_ok=True)
         fig.tight_layout()
-        fig.savefig(FIG_DIR / "exp2b_traceplots.pdf")
+        fig.savefig(FIG_DIR / "mcmc_traceplots.pdf")
 
 
 # ------------------------------------------------------------------
 def part_c(args):
-    out_csv = OUT_DIR / "exp2c_Z_approx_alpha_lt1.csv"
+    out_csv = OUT_DIR / "partition_function_error_small_alpha.csv"
     if out_csv.exists() and not args.append:
         out_csv.unlink()
     fieldnames = [
@@ -221,7 +223,7 @@ def main():
     p.add_argument("--mcmc-samples-logZ", type=int, default=20_000)
     p.add_argument("--seed", type=int, default=42)
     p.add_argument("--quick", action="store_true",
-                   help="single small grid for smoke testing")
+                   help="use a single small (n, alpha, beta) grid for quick validation")
     p.add_argument("--parts", type=str, default="A,B,C")
     p.add_argument("--append", action="store_true",
                    help="append to existing CSVs (default: overwrite)")

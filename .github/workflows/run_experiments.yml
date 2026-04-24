@@ -1,4 +1,4 @@
-name: Run reviewer-response experiments
+name: Run experiments
 
 on:
   workflow_dispatch:
@@ -8,11 +8,11 @@ on:
         type: string
         default: "50"
       only:
-        description: "Comma-separated experiment IDs to run (e.g. '1,3'). Empty = all six."
+        description: "Comma-separated script names (e.g. 'held_out_log_likelihood,alpha_bound_sensitivity'). Empty = all."
         type: string
         default: ""
       quick:
-        description: "Run smoke-test versions of each experiment (overrides n_trials)."
+        description: "Run every selected script with a reduced grid for quick validation (overrides n_trials)."
         type: boolean
         default: false
 
@@ -21,7 +21,7 @@ permissions:
 
 jobs:
   run:
-    name: reviewer-response-run
+    name: experiments
     runs-on: ubuntu-latest
     timeout-minutes: 350
 
@@ -77,7 +77,7 @@ jobs:
           INPUT_ONLY: ${{ inputs.only }}
         run: |
           set -o pipefail
-          mkdir -p experiments/reviewer_response/results experiments/reviewer_response/figures
+          mkdir -p experiments/results experiments/figures
           ARGS=()
           if [ "$INPUT_QUICK" = "true" ]; then
             ARGS+=(--quick)
@@ -87,9 +87,9 @@ jobs:
           if [ -n "$INPUT_ONLY" ]; then
             ARGS+=(--only "$INPUT_ONLY")
           fi
-          echo "Running: python -m experiments.reviewer_response.run_all ${ARGS[*]}"
-          python -m experiments.reviewer_response.run_all "${ARGS[@]}" \
-            2>&1 | tee experiments/reviewer_response/run.log
+          echo "Running: python -m experiments.run_all ${ARGS[*]}"
+          python -m experiments.run_all "${ARGS[@]}" \
+            2>&1 | tee experiments/run.log
 
       - name: Summarise results
         if: always()
@@ -99,16 +99,16 @@ jobs:
           INPUT_ONLY: ${{ inputs.only }}
         run: |
           {
-            echo "## Reviewer-response run"
+            echo "## Experiment run summary"
             echo ""
             echo "- \`quick\` = \`$INPUT_QUICK\`"
             echo "- \`n_trials\` = \`$INPUT_N_TRIALS\`"
-            echo "- \`only\` = \`${INPUT_ONLY:-<all six>}\`"
+            echo "- \`only\` = \`${INPUT_ONLY:-<all scripts>}\`"
             echo ""
             echo "### Row counts"
             echo '```'
-            if [ -f experiments/reviewer_response/check_status.py ]; then
-              python -m experiments.reviewer_response.check_status 2>&1 || true
+            if [ -f experiments/check_status.py ]; then
+              python -m experiments.check_status 2>&1 || true
             else
               echo "check_status.py not present on this branch; skipping."
             fi
@@ -116,15 +116,15 @@ jobs:
             echo ""
             echo "### Output files"
             echo '```'
-            ls -la experiments/reviewer_response/results/ 2>/dev/null || echo "(results/ missing)"
+            ls -la experiments/results/ 2>/dev/null || echo "(results/ missing)"
             echo ""
-            ls -la experiments/reviewer_response/figures/ 2>/dev/null || echo "(figures/ missing)"
+            ls -la experiments/figures/ 2>/dev/null || echo "(figures/ missing)"
             echo '```'
-            if [ -f experiments/reviewer_response/run.log ]; then
-              FAILURES="$(grep -E '^!! Experiment' experiments/reviewer_response/run.log || true)"
+            if [ -f experiments/run.log ]; then
+              FAILURES="$(grep -E '^!! ' experiments/run.log || true)"
               if [ -n "$FAILURES" ]; then
                 echo ""
-                echo "### Experiment failures"
+                echo "### Script failures"
                 echo '```'
                 echo "$FAILURES"
                 echo '```'
@@ -136,10 +136,10 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: reviewer-response-outputs-${{ github.run_id }}
+          name: experiment-outputs-${{ github.run_id }}
           path: |
-            experiments/reviewer_response/results/
-            experiments/reviewer_response/figures/
-            experiments/reviewer_response/run.log
+            experiments/results/
+            experiments/figures/
+            experiments/run.log
           if-no-files-found: warn
           retention-days: 30

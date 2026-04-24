@@ -1,24 +1,23 @@
-"""Experiment 3 -- alpha lower-bound sensitivity.
+"""Sensitivity of the L_alpha Mallows MLE to the lower bound on alpha.
 
-# Notes on the hard floor in the existing MLE implementation
------------------------------------------------------------
-* MLE/alpha_beta_estimation.py:solve_alpha_beta uses alpha_bounds=(1e-1, 3)
-  by default.  Both solve_alpha_beta_least_squares (used when n<=20) and
-  solve_alpha_beta_differential_evolution (n>20) enforce this range.
-* The lookup tables in GMM_diagonalized/lookup_tables/*.pkl only have
-  alpha_vals starting at 0.1, so any fit path that uses the lookup tables
-  (n>=30 in the shipped assets) cannot explore alpha_min < 0.1 without
-  recomputing the tables.
-* Consequently, baseball n=100 reports alpha_hat = 0.1 +/- 0.0 because the
-  optimiser is hitting the bound, not because 0.1 is the MLE.
-
-For this experiment we restrict to n=10 real-world datasets, where the DP
-path (without lookup tables) is used and we can legitimately probe
-alpha_min in {0.01, 0.05, 0.1, 0.2, 0.5}.
+Notes on the default lower bound in the MLE implementation
+----------------------------------------------------------
+* ``MLE.alpha_beta_estimation.solve_alpha_beta`` uses
+  ``alpha_bounds=(1e-1, 3)`` by default, enforced by both the
+  least-squares path (n <= 20) and the differential-evolution path
+  (n > 20).
+* The lookup tables shipped under ``GMM_diagonalized/lookup_tables/``
+  only have alpha values starting at 0.1, so any fit path that consults
+  the lookup tables (n >= 30 in the shipped assets) cannot explore
+  ``alpha_min < 0.1`` without re-computing those tables.
+* This script restricts itself to n=10 real-world datasets so the DP
+  path (which does not use the lookup tables) is exercised and
+  ``alpha_min`` can legitimately be varied in {0.01, 0.05, 0.1, 0.2, 0.5}.
 
 Outputs:
-  - results/exp3_alpha_floor.csv
-  - figures/exp3_sensitivity.pdf
+  - results/alpha_bound_sensitivity.csv
+  - results/alpha_bound_sensitivity_summary.csv
+  - figures/alpha_bound_sensitivity.pdf
 """
 
 from __future__ import annotations
@@ -35,16 +34,16 @@ from MLE.alpha_beta_estimation import solve_alpha_beta
 from MLE.consensus_ranking_estimation import consensus_ranking_estimation
 from MLE.top_k import evaluate_metrics
 
-from experiments.reviewer_response.common.datasets import (
+from experiments.common.datasets import (
     DatasetUnavailable, load_dataset, split,
 )
-from experiments.reviewer_response.common.loglik import (
+from experiments.common.loglik import (
     choose_truncation,
     log_Z_distance_dp,
     loglik_distance,
     loglik_distance_mcmc,
 )
-from experiments.reviewer_response.common.results_io import append_csv_row, existing_keys
+from experiments.common.results_io import append_csv_row, existing_keys
 
 OUT_DIR = Path(__file__).parent / "results"
 FIG_DIR = Path(__file__).parent / "figures"
@@ -89,7 +88,7 @@ def run(args):
     n_trials = 2 if args.quick else args.n_trials
     alpha_mins = args.alpha_mins
 
-    out_csv = OUT_DIR / "exp3_alpha_floor.csv"
+    out_csv = OUT_DIR / "alpha_bound_sensitivity.csv"
     fieldnames = [
         "dataset", "n", "trial", "alpha_min",
         "alpha_hat", "beta_hat",
@@ -143,7 +142,7 @@ def run(args):
         top1_mean=("top1_hit_rate", "mean"),
         loglik_mean=("loglik", "mean"),
     ).reset_index()
-    agg.to_csv(OUT_DIR / "exp3_alpha_floor_summary.csv", index=False)
+    agg.to_csv(OUT_DIR / "alpha_bound_sensitivity_summary.csv", index=False)
 
     datasets_plotted = agg[["dataset", "n"]].drop_duplicates().values.tolist()
     if datasets_plotted:
@@ -173,7 +172,7 @@ def run(args):
             axL.legend(fontsize=8)
         fig.tight_layout()
         FIG_DIR.mkdir(parents=True, exist_ok=True)
-        fig.savefig(FIG_DIR / "exp3_sensitivity.pdf")
+        fig.savefig(FIG_DIR / "alpha_bound_sensitivity.pdf")
 
 
 def main():
