@@ -1,0 +1,145 @@
+name: Run reviewer-response experiments
+
+on:
+  workflow_dispatch:
+    inputs:
+      n_trials:
+        description: "Trials per experiment (ignored when quick=true)."
+        type: string
+        default: "50"
+      only:
+        description: "Comma-separated experiment IDs to run (e.g. '1,3'). Empty = all six."
+        type: string
+        default: ""
+      quick:
+        description: "Run smoke-test versions of each experiment (overrides n_trials)."
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  run:
+    name: reviewer-response-run
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+
+    env:
+      PYTHONUNBUFFERED: "1"
+      KAGGLE_USERNAME: ${{ secrets.KAGGLE_USERNAME }}
+      KAGGLE_KEY: ${{ secrets.KAGGLE_KEY }}
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements.txt
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install kaggle kagglehub pulp
+
+      - name: Write Kaggle credentials
+        env:
+          KAGGLE_USERNAME: ${{ secrets.KAGGLE_USERNAME }}
+          KAGGLE_KEY: ${{ secrets.KAGGLE_KEY }}
+        run: |
+          if [ -z "$KAGGLE_USERNAME" ] || [ -z "$KAGGLE_KEY" ]; then
+            echo "::warning title=Kaggle secrets missing::KAGGLE_USERNAME / KAGGLE_KEY are not set. College-sports datasets will be skipped."
+            exit 0
+          fi
+          mkdir -p ~/.kaggle
+          umask 077
+          python - <<'PY'
+          import json, os, pathlib
+          path = pathlib.Path.home() / ".kaggle" / "kaggle.json"
+          path.write_text(json.dumps({
+              "username": os.environ["KAGGLE_USERNAME"],
+              "key": os.environ["KAGGLE_KEY"],
+          }))
+          path.chmod(0o600)
+          PY
+          echo "Wrote ~/.kaggle/kaggle.json (mode 600)."
+
+      - name: Run experiments
+        id: run
+        env:
+          INPUT_QUICK: ${{ inputs.quick }}
+          INPUT_N_TRIALS: ${{ inputs.n_trials }}
+          INPUT_ONLY: ${{ inputs.only }}
+        run: |
+          set -o pipefail
+          mkdir -p experiments/reviewer_response/results experiments/reviewer_response/figures
+          ARGS=()
+          if [ "$INPUT_QUICK" = "true" ]; then
+            ARGS+=(--quick)
+          else
+            ARGS+=(--n-trials "$INPUT_N_TRIALS")
+          fi
+          if [ -n "$INPUT_ONLY" ]; then
+            ARGS+=(--only "$INPUT_ONLY")
+          fi
+          echo "Running: python -m experiments.reviewer_response.run_all ${ARGS[*]}"
+          python -m experiments.reviewer_response.run_all "${ARGS[@]}" \
+            2>&1 | tee experiments/reviewer_response/run.log
+
+      - name: Summarise results
+        if: always()
+        env:
+          INPUT_QUICK: ${{ inputs.quick }}
+          INPUT_N_TRIALS: ${{ inputs.n_trials }}
+          INPUT_ONLY: ${{ inputs.only }}
+        run: |
+          {
+            echo "## Reviewer-response run"
+            echo ""
+            echo "- \`quick\` = \`$INPUT_QUICK\`"
+            echo "- \`n_trials\` = \`$INPUT_N_TRIALS\`"
+            echo "- \`only\` = \`${INPUT_ONLY:-<all six>}\`"
+            echo ""
+            echo "### Row counts"
+            echo '```'
+            if [ -f experiments/reviewer_response/check_status.py ]; then
+              python -m experiments.reviewer_response.check_status 2>&1 || true
+            else
+              echo "check_status.py not present on this branch; skipping."
+            fi
+            echo '```'
+            echo ""
+            echo "### Output files"
+            echo '```'
+            ls -la experiments/reviewer_response/results/ 2>/dev/null || echo "(results/ missing)"
+            echo ""
+            ls -la experiments/reviewer_response/figures/ 2>/dev/null || echo "(figures/ missing)"
+            echo '```'
+            if [ -f experiments/reviewer_response/run.log ]; then
+              FAILURES="$(grep -E '^!! Experiment' experiments/reviewer_response/run.log || true)"
+              if [ -n "$FAILURES" ]; then
+                echo ""
+                echo "### Experiment failures"
+                echo '```'
+                echo "$FAILURES"
+                echo '```'
+              fi
+            fi
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload outputs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reviewer-response-outputs-${{ github.run_id }}
+          path: |
+            experiments/reviewer_response/results/
+            experiments/reviewer_response/figures/
+            experiments/reviewer_response/run.log
+          if-no-files-found: warn
+          retention-days: 30
